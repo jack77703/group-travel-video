@@ -61,17 +61,26 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to create upload URL' }, { status: 500 })
   }
 
-  await supabase.from('photos').insert({
+  const { error: photoInsertError } = await supabase.from('photos').insert({
     room_id: room.id,
     member_id: member.id,
     storage_path,
     display_order,
   })
 
-  await supabase
+  if (photoInsertError) {
+    console.error('Photo insert error:', photoInsertError)
+    return NextResponse.json({ error: 'Failed to record photo' }, { status: 500 })
+  }
+
+  const { error: memberUpdateError } = await supabase
     .from('members')
     .update({ photos_uploaded: member.photos_uploaded + 1 })
     .eq('id', member.id)
+
+  if (memberUpdateError) {
+    console.error('Member update error:', memberUpdateError)
+  }
 
   return NextResponse.json({ upload_url: uploadData.signedUrl, path: storage_path })
 }

@@ -3,13 +3,14 @@
 import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
 
-import { setInitiatorToken } from '@/lib/session'
+import { setInitiatorToken, setSession } from '@/lib/session'
 
 const OCCASIONS = ['Trip', 'Birthday', 'Wedding', 'Company Event', 'Graduation', 'Other']
 
 export default function CreatePage() {
   const router = useRouter()
   const [name, setName] = useState('')
+  const [initiatorName, setInitiatorName] = useState('')
   const [occasion, setOccasion] = useState('')
   const [maxPhotos, setMaxPhotos] = useState(5)
   const [loading, setLoading] = useState(false)
@@ -36,8 +37,25 @@ export default function CreatePage() {
         throw new Error(data.error)
       }
 
+      const joinRes = await fetch(`/api/rooms/${data.code}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: initiatorName }),
+      })
+      const joinData = await joinRes.json()
+
+      if (!joinRes.ok) {
+        throw new Error(joinData.error)
+      }
+
       setInitiatorToken(data.code, data.created_by_token)
-      router.push(`/room/${data.code}/lobby`)
+      setSession(data.code, {
+        token: joinData.session_token,
+        roomCode: data.code,
+        memberId: joinData.member_id,
+        memberName: joinData.name,
+      })
+      router.push(`/room/${data.code}/upload`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -66,6 +84,17 @@ export default function CreatePage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Bali Trip 2026"
+                required
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200 focus:ring-4 focus:ring-amber-200/10"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white/70">Your name</label>
+              <input
+                value={initiatorName}
+                onChange={(e) => setInitiatorName(e.target.value)}
+                placeholder="e.g. Jack"
                 required
                 className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200 focus:ring-4 focus:ring-amber-200/10"
               />
@@ -116,7 +145,7 @@ export default function CreatePage() {
 
             <button
               type="submit"
-              disabled={loading || !name || !occasion}
+              disabled={loading || !name.trim() || !initiatorName.trim() || !occasion}
               className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? 'Creating...' : 'Create Room'}
