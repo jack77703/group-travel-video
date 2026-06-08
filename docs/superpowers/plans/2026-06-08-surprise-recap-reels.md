@@ -1591,6 +1591,21 @@ git commit -m "feat: generate page and reel reveal page"
 
 ---
 
+## Future Features (v2)
+
+### Music Search (Pixabay API)
+Let users search and pick specific tracks instead of preset genres.
+
+**What changes:**
+- `lib/music.ts` → replaced by `lib/music-search.ts` (function that calls Pixabay Music API)
+- New API route: `app/api/music/search/route.ts` — proxies Pixabay so the API key stays server-side
+- `app/room/[code]/generate/page.tsx` — replace genre buttons with search input + results list
+- Supabase schema: add `music_url text` column to `rooms` table to store the chosen track URL instead of just a genre name
+
+**Why Pixabay:** Free, royalty-free, returns direct `.mp3` URLs that Creatomate can use. Spotify/YouTube won't work — their streams are DRM protected.
+
+---
+
 ## Final Pre-Launch Checklist
 
 - [ ] All env vars set in `.env.local`
