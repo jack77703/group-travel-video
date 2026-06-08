@@ -1,4 +1,4 @@
-# Surprise Recap Reels Implementation Plan
+# Surprise Recap Reels — Spec & Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -7,6 +7,34 @@
 **Architecture:** Next.js 14 App Router for frontend and API routes; Supabase for Postgres, Realtime, and file storage; Creatomate API for server-side video generation delivered via webhook; anonymous session tokens stored in localStorage for identity.
 
 **Tech Stack:** Next.js 14, TypeScript, Tailwind CSS, `@supabase/supabase-js`, `creatomate`
+
+---
+
+## Product Overview
+
+A mobile-first web app for any group occasion (trips, birthdays, weddings, company events).
+
+**Core experience:**
+1. Initiator creates a Room and shares a link
+2. Members join by entering their name — everyone can see who's in the room
+3. Each member uploads their own photos privately (others cannot see them)
+4. Initiator sees upload progress (names + whether each person uploaded, not the photos)
+5. Initiator picks a music genre and hits "Generate"
+6. Creatomate renders an MP4 slideshow — revealed to all members as a surprise
+7. Members watch in-app and download to share on Instagram, TikTok, etc.
+
+**Key constraints:**
+- No login required — anonymous session tokens in localStorage, expire after 30 days
+- Initiator is identified by a `created_by_token` saved in localStorage at room creation
+- Only the initiator can trigger generation
+- Photos are stored privately (signed URLs, 1hr expiry) — never visible to other members
+- After reel is done, all members can access the MP4
+
+**User flows:**
+```
+Initiator: / → /create → /room/[code]/lobby → /room/[code]/generate → /room/[code]/reel
+Member:    /room/[code] → /room/[code]/upload → /room/[code]/lobby → /room/[code]/reel
+```
 
 ---
 
