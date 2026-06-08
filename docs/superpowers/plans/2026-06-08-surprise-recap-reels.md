@@ -32,9 +32,11 @@ A mobile-first web app for any group occasion (trips, birthdays, weddings, compa
 
 **User flows:**
 ```
-Initiator: / → /create → /room/[code]/lobby → /room/[code]/generate → /room/[code]/reel
+Initiator: / → /create (name + room details + auto-join) → /room/[code]/upload → /room/[code]/lobby → /room/[code]/generate → /room/[code]/reel
 Member:    /room/[code] → /room/[code]/upload → /room/[code]/lobby → /room/[code]/reel
 ```
+
+**Note:** The initiator enters their name on the create form. After the room is created, the app automatically calls `/join` with that name so the initiator is a full member (appears in lobby, can upload photos). They end up with both an `initiator token` (for Generate access) and a `session token` (for uploads) in localStorage.
 
 ---
 
