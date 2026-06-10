@@ -5,7 +5,6 @@ import { createServerClient } from '@/lib/supabase-server'
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const { id: render_id, status, url } = body
-  console.log('[webhook] payload:', JSON.stringify({ render_id, status, url, raw: body }))
 
   if (!render_id || !status) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
