@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
+  console.log('[webhook] payload:', JSON.stringify(body))
   const { id: render_id, status, url } = body
 
   if (!render_id || !status) {
@@ -12,11 +13,13 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServerClient()
 
-  const { data: reel } = await supabase
+  const { data: reel, error: reelError } = await supabase
     .from('reels')
     .select('id, room_id')
     .eq('render_id', render_id)
     .single()
+
+  console.log('[webhook] render_id:', render_id, 'reel:', JSON.stringify(reel), 'error:', JSON.stringify(reelError))
 
   if (!reel) {
     return NextResponse.json({ ok: true })

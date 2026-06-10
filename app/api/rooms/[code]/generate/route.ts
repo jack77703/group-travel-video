@@ -91,13 +91,15 @@ export async function POST(
   })
 
   const render_id = renders[0].id
+  console.log('[generate] render_id:', render_id, 'room.id:', room.id)
 
   await supabase
     .from('rooms')
     .update({ status: 'generating', music_genre: music_name ?? music_url })
     .eq('id', room.id)
 
-  await supabase.from('reels').insert({ room_id: room.id, render_id, status: 'processing' })
+  const { error: reelInsertError } = await supabase.from('reels').insert({ room_id: room.id, render_id, status: 'processing' })
+  console.log('[generate] reel insert error:', JSON.stringify(reelInsertError))
 
   return NextResponse.json({ render_id, status: 'processing' })
 }
