@@ -10,7 +10,6 @@ export default function CreatePage() {
   const [name, setName] = useState('')
   const [initiatorName, setInitiatorName] = useState('')
   const [requiredPhotos, setRequiredPhotos] = useState(3)
-  const maxMembers = Math.min(20, Math.floor(60 / requiredPhotos))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -116,7 +115,7 @@ export default function CreatePage() {
                 className="w-full accent-amber-200"
               />
               <p className="mt-2 text-xs text-white/35">
-                Everyone must upload exactly {requiredPhotos} photo{requiredPhotos !== 1 ? 's' : ''}. Up to {maxMembers} members can join.
+                Everyone must upload exactly {requiredPhotos} photo{requiredPhotos !== 1 ? 's' : ''}. Up to {Math.min(20, Math.floor(60 / requiredPhotos))} members can join.
               </p>
             </div>
 
