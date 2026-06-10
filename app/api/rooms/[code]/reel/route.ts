@@ -12,7 +12,7 @@ export async function GET(
 
   const { data: room } = await supabase
     .from('rooms')
-    .select('id')
+    .select('id, status')
     .eq('code', params.code.toUpperCase())
     .single()
 
@@ -24,11 +24,13 @@ export async function GET(
     .from('reels')
     .select('status, mp4_url')
     .eq('room_id', room.id)
-    .single()
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   if (!reel) {
-    return NextResponse.json({ status: 'not_started' })
+    return NextResponse.json({ room_status: room.status, status: 'not_started', mp4_url: null })
   }
 
-  return NextResponse.json({ status: reel.status, mp4_url: reel.mp4_url })
+  return NextResponse.json({ room_status: room.status, status: reel.status, mp4_url: reel.mp4_url })
 }
