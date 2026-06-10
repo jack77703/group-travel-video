@@ -26,16 +26,19 @@ export default function Home() {
 
           <div className="relative space-y-10">
             <div className="space-y-5">
-              <p className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
-                Private group recap
+              <p className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
+                upload secretly
+                <span className="text-amber-300">↗</span>
               </p>
               <div className="space-y-4">
                 <h1 className="text-5xl font-black leading-[0.95] tracking-tight">
                   Reveel
                 </h1>
-                <p className="text-lg leading-7 text-white/65">
-                  Everyone uploads secretly. You hit generate. They&apos;re surprised.
-                </p>
+                <div className="space-y-1 text-lg font-medium leading-8 text-white/65">
+                  <p>Everyone brings their best shots&nbsp;&mdash; secretly.</p>
+                  <p>You hit generate.</p>
+                  <p className="text-white/90">Nobody sees it coming.</p>
+                </div>
               </div>
             </div>
 
