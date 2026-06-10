@@ -16,6 +16,7 @@ export default function LobbyPage() {
   const [isInitiator, setIsInitiator] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const loadRoom = useCallback(async () => {
     try {
@@ -130,13 +131,30 @@ export default function LobbyPage() {
               >
                 Home
               </button>
-              <button
-                type="button"
-                onClick={() => router.push('/create')}
-                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
-              >
-                New Room
-              </button>
+              {isInitiator && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/create')}
+                    className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+                  >
+                    New Room
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${window.location.origin}/room/${code}`
+                      navigator.clipboard.writeText(url).then(() => {
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 2000)
+                      })
+                    }}
+                    className="rounded-full border border-amber-200/30 bg-amber-200/10 px-3 py-1 text-xs font-semibold text-amber-200 transition hover:bg-amber-200/20"
+                  >
+                    {copied ? 'Copied!' : 'Share'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <h1 className="text-4xl font-black tracking-tight">{room.name}</h1>

@@ -1,6 +1,17 @@
+'use client'
+
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
+
+import { listSessions, Session } from '@/lib/session'
 
 export default function Home() {
+  const [sessions, setSessions] = useState<Session[]>([])
+
+  useEffect(() => {
+    setSessions(listSessions())
+  }, [])
+
   return (
     <main className="min-h-screen overflow-hidden bg-black px-6 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center py-12">
@@ -38,6 +49,29 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {sessions.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
+                  Your rooms
+                </p>
+                {sessions.map((s) => (
+                  <Link
+                    key={s.roomCode}
+                    href={`/room/${s.roomCode}/lobby`}
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.09]"
+                  >
+                    <div>
+                      <p className="font-mono text-sm font-bold tracking-widest text-amber-100">
+                        {s.roomCode}
+                      </p>
+                      <p className="text-xs text-white/40">{s.memberName}</p>
+                    </div>
+                    <span className="text-xs text-white/30">Rejoin →</span>
+                  </Link>
+                ))}
+              </div>
+            )}
 
             <Link
               href="/create"

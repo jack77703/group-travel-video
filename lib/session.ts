@@ -29,3 +29,20 @@ export function getInitiatorToken(roomCode: string): string | null {
 export function setInitiatorToken(roomCode: string, token: string): void {
   localStorage.setItem(`${KEY}_${roomCode}_initiator`, token)
 }
+
+export function listSessions(): Session[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const sessions: Session[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(`${KEY}_`) && !key.endsWith('_initiator')) {
+        const raw = localStorage.getItem(key)
+        if (raw) sessions.push(JSON.parse(raw) as Session)
+      }
+    }
+    return sessions
+  } catch {
+    return []
+  }
+}
