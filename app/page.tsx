@@ -31,7 +31,7 @@ export default function Home() {
               </p>
               <div className="space-y-4">
                 <h1 className="text-5xl font-black leading-[0.95] tracking-tight">
-                  Surprise Reel
+                  Reveel
                 </h1>
                 <p className="text-lg leading-7 text-white/65">
                   Everyone uploads secretly. You hit generate. They&apos;re surprised.
