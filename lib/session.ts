@@ -5,6 +5,7 @@ export interface Session {
   roomCode: string
   memberId: string
   memberName: string
+  roomName: string
 }
 
 export function getSession(roomCode: string): Session | null {
