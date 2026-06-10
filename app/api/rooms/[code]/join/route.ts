@@ -16,7 +16,7 @@ export async function POST(
 
   const { data: room } = await supabase
     .from('rooms')
-    .select('id, status, max_photos_per_member, created_by_token')
+    .select('id, name, status, max_photos_per_member, created_by_token')
     .eq('code', params.code.toUpperCase())
     .single()
 
@@ -69,6 +69,7 @@ export async function POST(
     member_id: member.id,
     session_token,
     name: member.name,
+    room_name: room.name,
     max_photos_per_member: room.max_photos_per_member,
   })
 }
