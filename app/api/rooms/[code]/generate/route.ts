@@ -150,12 +150,15 @@ export async function POST(
     .update({ status: 'generating', music_genre: music_name ?? music_url })
     .eq('id', room.id)
 
-  const { error: reelInsertError } = await supabase
+  const { error: reelUpsertError } = await supabase
     .from('reels')
-    .insert({ room_id: room.id, render_id, status: 'processing' })
+    .upsert(
+      { room_id: room.id, render_id, status: 'processing', mp4_url: null },
+      { onConflict: 'room_id' }
+    )
 
-  if (reelInsertError) {
-    console.error('[generate] reel insert failed:', reelInsertError)
+  if (reelUpsertError) {
+    console.error('[generate] reel upsert failed:', reelUpsertError)
     await supabase.from('rooms').update({ status: 'open' }).eq('id', room.id)
     return NextResponse.json({ error: 'Failed to start reel generation' }, { status: 500 })
   }
