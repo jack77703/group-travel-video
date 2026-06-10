@@ -5,14 +5,11 @@ import { FormEvent, useState } from 'react'
 
 import { setInitiatorToken, setSession } from '@/lib/session'
 
-const OCCASIONS = ['Trip', 'Birthday', 'Wedding', 'Company Event', 'Graduation', 'Other']
-
 export default function CreatePage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [initiatorName, setInitiatorName] = useState('')
-  const [occasion, setOccasion] = useState('')
-  const [maxPhotos, setMaxPhotos] = useState(5)
+  const [requiredPhotos, setRequiredPhotos] = useState(3)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -27,8 +24,7 @@ export default function CreatePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          occasion,
-          max_photos_per_member: maxPhotos,
+          max_photos_per_member: requiredPhotos,
         }),
       })
       const data = await res.json()
@@ -76,7 +72,7 @@ export default function CreatePage() {
             </p>
             <h1 className="text-4xl font-black tracking-tight">Create a Reel Room</h1>
             <p className="text-sm leading-6 text-white/55">
-              Name the moment, set a photo limit, then share the room with your group.
+              Name the moment, set how many photos each person must upload, then share the room.
             </p>
           </div>
 
@@ -103,41 +99,24 @@ export default function CreatePage() {
               />
             </div>
 
-            <div>
-              <label className="mb-3 block text-sm font-medium text-white/70">Occasion</label>
-              <div className="grid grid-cols-2 gap-2">
-                {OCCASIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setOccasion(option)}
-                    className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
-                      occasion === option
-                        ? 'border-white bg-white text-black'
-                        : 'border-white/10 bg-white/[0.07] text-white/70 hover:border-white/25 hover:text-white'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-4">
               <label className="mb-3 flex items-center justify-between text-sm font-medium text-white/70">
-                <span>Max photos per person</span>
+                <span>Required photos per person</span>
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-black">
-                  {maxPhotos}
+                  {requiredPhotos}
                 </span>
               </label>
               <input
                 type="range"
                 min={1}
                 max={10}
-                value={maxPhotos}
-                onChange={(e) => setMaxPhotos(Number(e.target.value))}
+                value={requiredPhotos}
+                onChange={(e) => setRequiredPhotos(Number(e.target.value))}
                 className="w-full accent-amber-200"
               />
+              <p className="mt-2 text-xs text-white/35">
+                Everyone must upload exactly {requiredPhotos} photo{requiredPhotos !== 1 ? 's' : ''} before you can generate the reel.
+              </p>
             </div>
 
             {error && (
@@ -148,7 +127,7 @@ export default function CreatePage() {
 
             <button
               type="submit"
-              disabled={loading || !name.trim() || !initiatorName.trim() || !occasion}
+              disabled={loading || !name.trim() || !initiatorName.trim()}
               className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? 'Creating...' : 'Create Room'}

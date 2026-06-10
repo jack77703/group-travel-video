@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-import { listSessions, Session } from '@/lib/session'
+import { listSessions, removeSession, Session } from '@/lib/session'
 
 export default function Home() {
   const [sessions, setSessions] = useState<Session[]>([])
@@ -11,6 +11,11 @@ export default function Home() {
   useEffect(() => {
     setSessions(listSessions())
   }, [])
+
+  function handleRemove(roomCode: string) {
+    removeSession(roomCode)
+    setSessions((prev) => prev.filter((s) => s.roomCode !== roomCode))
+  }
 
   return (
     <main className="min-h-screen overflow-hidden bg-black px-6 text-white">
@@ -34,41 +39,34 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-4 shadow-2xl shadow-black/40 backdrop-blur">
-              <div className="aspect-[9/12] rounded-[1.5rem] bg-gradient-to-br from-white via-amber-200 to-sky-300 p-1">
-                <div className="flex h-full flex-col justify-between rounded-[1.25rem] bg-black p-5">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="h-24 rounded-2xl bg-white/20" />
-                    <div className="h-24 rounded-2xl bg-amber-300/70" />
-                    <div className="h-24 rounded-2xl bg-sky-300/70" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="h-3 w-2/3 rounded-full bg-white/80" />
-                    <div className="h-3 w-1/2 rounded-full bg-white/30" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {sessions.length > 0 && (
               <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
                   Your rooms
                 </p>
                 {sessions.map((s) => (
-                  <Link
-                    key={s.roomCode}
-                    href={`/room/${s.roomCode}/lobby`}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.09]"
-                  >
-                    <div>
-                      <p className="font-mono text-sm font-bold tracking-widest text-amber-100">
-                        {s.roomCode}
-                      </p>
-                      <p className="text-xs text-white/40">{s.memberName}</p>
-                    </div>
-                    <span className="text-xs text-white/30">Rejoin →</span>
-                  </Link>
+                  <div key={s.roomCode} className="flex items-center gap-2">
+                    <Link
+                      href={`/room/${s.roomCode}/lobby`}
+                      className="flex flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.09]"
+                    >
+                      <div>
+                        <p className="font-mono text-sm font-bold tracking-widest text-amber-100">
+                          {s.roomCode}
+                        </p>
+                        <p className="text-xs text-white/40">{s.memberName}</p>
+                      </div>
+                      <span className="text-xs text-white/30">Rejoin →</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(s.roomCode)}
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/10 text-white/30 transition hover:border-red-400/30 hover:text-red-300"
+                      aria-label="Remove room"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

@@ -9,9 +9,9 @@ function generateRoomCode(): string {
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { name, occasion, max_photos_per_member } = body
+  const { name, max_photos_per_member } = body
 
-  if (!name || !occasion || !max_photos_per_member) {
+  if (!name || !max_photos_per_member) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
   if (max_photos_per_member < 1 || max_photos_per_member > 10) {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('rooms')
-    .insert({ name, occasion, max_photos_per_member, code, created_by_token })
+    .insert({ name, max_photos_per_member, code, created_by_token })
     .select()
     .single()
 

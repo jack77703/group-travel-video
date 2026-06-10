@@ -127,9 +127,15 @@ export default function UploadPage() {
                   <span className="text-base font-semibold text-white/35"> / {maxPhotos}</span>
                 </p>
               </div>
-              <p className="rounded-full bg-white px-3 py-1 text-sm font-bold text-black">
-                {slotsLeft} left
-              </p>
+              {uploaded >= maxPhotos ? (
+                <p className="rounded-full bg-emerald-300/15 px-3 py-1 text-sm font-bold text-emerald-200">
+                  Done
+                </p>
+              ) : (
+                <p className="rounded-full bg-white px-3 py-1 text-sm font-bold text-black">
+                  {slotsLeft} left
+                </p>
+              )}
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-white/10">
               <div
@@ -169,23 +175,14 @@ export default function UploadPage() {
             </p>
           )}
 
-          {uploaded > 0 ? (
-            <button
-              type="button"
-              onClick={() => router.push(`/room/${code}/lobby`)}
-              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
-            >
-              Done — Go to Lobby
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => router.push(`/room/${code}/lobby`)}
-              className="w-full py-3 text-sm text-white/30 transition hover:text-white/60"
-            >
-              Skip for now
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => router.push(`/room/${code}/lobby`)}
+            disabled={uploaded < maxPhotos}
+            className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            Done — Go to Lobby
+          </button>
         </div>
       </div>
     </main>

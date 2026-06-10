@@ -158,6 +158,9 @@ export default function LobbyPage() {
             </div>
           </div>
           <h1 className="text-4xl font-black tracking-tight">{room.name}</h1>
+          <p className="text-sm text-white/40">
+            {room.members.length} member{room.members.length !== 1 ? 's' : ''} · up to 20
+          </p>
 
           <div className="flex-1 space-y-3">
             {room.members.map((member: MemberPublic) => {

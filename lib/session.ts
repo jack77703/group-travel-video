@@ -30,6 +30,11 @@ export function setInitiatorToken(roomCode: string, token: string): void {
   localStorage.setItem(`${KEY}_${roomCode}_initiator`, token)
 }
 
+export function removeSession(roomCode: string): void {
+  localStorage.removeItem(`${KEY}_${roomCode}`)
+  localStorage.removeItem(`${KEY}_${roomCode}_initiator`)
+}
+
 export function listSessions(): Session[] {
   if (typeof window === 'undefined') return []
   try {

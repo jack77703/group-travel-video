@@ -12,7 +12,7 @@ export async function GET(
 
   const { data: room, error } = await supabase
     .from('rooms')
-    .select('id, code, name, occasion, status, max_photos_per_member')
+    .select('id, code, name, status, max_photos_per_member')
     .eq('code', params.code.toUpperCase())
     .single()
 
