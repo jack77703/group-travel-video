@@ -17,27 +17,20 @@ export default function LobbyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const loadRoom = useCallback(async () => {
     try {
       const res = await fetch(`/api/rooms/${code}`)
       const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Could not load room')
-      }
-
+      if (!res.ok) throw new Error(data.error ?? 'Could not load room')
       setRoom(data)
       setLoading(false)
-
-      if (data.status === 'done' || data.status === 'generating') {
-        router.replace(`/room/${code}/reel`)
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load room')
       setLoading(false)
     }
-  }, [code, router])
+  }, [code])
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null
@@ -57,57 +50,59 @@ export default function LobbyPage() {
         .channel(`lobby-${data.id}`)
         .on(
           'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'members',
-            filter: `room_id=eq.${data.id}`,
-          },
+          { event: '*', schema: 'public', table: 'members', filter: `room_id=eq.${data.id}` },
           () => loadRoom()
         )
         .on(
           'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'rooms',
-            filter: `id=eq.${data.id}`,
-          },
-          (payload) => {
-            const nextStatus = payload.new.status
-            if (nextStatus === 'done' || nextStatus === 'generating') {
-              router.replace(`/room/${code}/reel`)
-              return
-            }
-            loadRoom()
-          }
+          { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${data.id}` },
+          () => loadRoom()
         )
-        .subscribe((status) => {
-          console.log('Realtime status:', status)
-        })
+        .subscribe()
     }
 
     subscribeToLobby()
 
     return () => {
       cancelled = true
-      if (channel) {
-        getSupabaseClient().removeChannel(channel)
-      }
+      if (channel) getSupabaseClient().removeChannel(channel)
     }
-  }, [code, loadRoom, router])
+  }, [code, loadRoom])
+
+  function copyInvite() {
+    const url = `${window.location.origin}/room/${code}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  async function handleGenerateAgain() {
+    const initiatorToken = getInitiatorToken(code)
+    if (!initiatorToken) return
+    setResetting(true)
+    try {
+      await fetch(`/api/rooms/${code}/reset`, {
+        method: 'POST',
+        headers: { 'x-initiator-token': initiatorToken },
+      })
+      router.push(`/room/${code}/generate`)
+    } catch {
+      setResetting(false)
+    }
+  }
 
   if (loading || !room) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
-        <p className="text-white/45">Loading lobby...</p>
+      <main className="flex h-screen items-center justify-center bg-black px-6 text-white">
+        <p className="text-white/45">Loading...</p>
       </main>
     )
   }
 
   if (error) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
+      <main className="flex h-screen items-center justify-center bg-black px-6 text-white">
         <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
         </p>
@@ -115,106 +110,122 @@ export default function LobbyPage() {
     )
   }
 
+  const maxMembers = Math.min(20, Math.floor(60 / room.max_photos_per_member))
+  const allZero = room.members.every((m: MemberPublic) => m.photos_uploaded === 0)
+
   return (
-    <main className="min-h-screen bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col">
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
-              Room {room.code}
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => router.push('/')}
-                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
-              >
-                Home
-              </button>
-              {isInitiator && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/create')}
-                    className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
-                  >
-                    New Room
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = `${window.location.origin}/room/${code}`
-                      navigator.clipboard.writeText(url).then(() => {
-                        setCopied(true)
-                        setTimeout(() => setCopied(false), 2000)
-                      })
-                    }}
-                    className="rounded-full border border-amber-200/30 bg-amber-200/10 px-3 py-1 text-xs font-semibold text-amber-200 transition hover:bg-amber-200/20"
-                  >
-                    {copied ? 'Copied!' : 'Share'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          <h1 className="text-4xl font-black tracking-tight">{room.name}</h1>
-          <p className="text-sm text-white/40">
-            {room.members.length} / {Math.min(20, Math.floor(60 / room.max_photos_per_member))} members
-          </p>
+    <main className="flex h-screen flex-col bg-black px-6 py-8 text-white">
+      {/* Top bar */}
+      <div className="flex flex-shrink-0 items-center justify-between">
+        <button
+          type="button"
+          onClick={() => router.push('/')}
+          className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+        >
+          ← Home
+        </button>
+        {isInitiator && (
+          <button
+            type="button"
+            onClick={copyInvite}
+            className="rounded-full border border-amber-200/30 bg-amber-200/10 px-3 py-1 text-xs font-semibold text-amber-200 transition hover:bg-amber-200/20"
+          >
+            {copied ? 'Copied!' : 'Share invite'}
+          </button>
+        )}
+      </div>
 
-          <div className="flex-1 space-y-3">
-            {room.members.map((member: MemberPublic) => {
-              const hasUploaded = member.photos_uploaded > 0
+      {/* Room info */}
+      <div className="mt-5 flex-shrink-0">
+        <h1 className="text-3xl font-black tracking-tight">{room.name}</h1>
+        <p className="mt-1 text-sm text-white/40">
+          {room.members.length} / {maxMembers} members
+        </p>
+      </div>
 
-              return (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold">{member.name}</p>
-                      {member.is_initiator && (
-                        <span className="rounded-full bg-amber-200/15 px-2 py-0.5 text-xs font-semibold text-amber-200">
-                          Host
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-white/40">
-                      {member.photos_uploaded} photo{member.photos_uploaded === 1 ? '' : 's'}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      hasUploaded
-                        ? 'bg-emerald-300/15 text-emerald-200'
-                        : 'bg-white/10 text-white/40'
-                    }`}
-                  >
-                    {hasUploaded ? 'uploaded' : 'waiting'}
-                  </span>
+      {/* Member list — only this area scrolls */}
+      <div className="mt-5 min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {room.members.map((member: MemberPublic) => {
+          const hasUploaded = member.photos_uploaded > 0
+          return (
+            <div
+              key={member.id}
+              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold">{member.name}</p>
+                  {member.is_initiator && (
+                    <span className="rounded-full bg-amber-200/15 px-2 py-0.5 text-xs font-semibold text-amber-200">
+                      Host
+                    </span>
+                  )}
                 </div>
-              )
-            })}
-          </div>
-        </div>
+                <p className="text-xs text-white/40">
+                  {member.photos_uploaded} photo{member.photos_uploaded === 1 ? '' : 's'}
+                </p>
+              </div>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  hasUploaded
+                    ? 'bg-emerald-300/15 text-emerald-200'
+                    : 'bg-white/10 text-white/40'
+                }`}
+              >
+                {hasUploaded ? 'uploaded' : 'waiting'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
 
-        <div className="mt-auto pt-8">
-          {isInitiator ? (
+      {/* Footer — three states */}
+      <div className="mt-5 flex-shrink-0 space-y-3">
+        {room.status === 'open' && isInitiator && (
+          <button
+            type="button"
+            onClick={() => router.push(`/room/${code}/generate`)}
+            disabled={allZero}
+            className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            Generate Reel
+          </button>
+        )}
+
+        {room.status === 'open' && !isInitiator && (
+          <p className="py-3 text-center text-sm text-white/40">
+            Waiting for the host to generate the reel...
+          </p>
+        )}
+
+        {room.status === 'generating' && (
+          <div className="flex items-center justify-center gap-3 py-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            <p className="text-sm text-white/60">Generating your reel...</p>
+          </div>
+        )}
+
+        {room.status === 'done' && (
+          <>
             <button
               type="button"
-              onClick={() => router.push(`/room/${code}/generate`)}
-              disabled={room.members.every((m: MemberPublic) => m.photos_uploaded === 0)}
-              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-30"
+              onClick={() => router.push(`/room/${code}/share`)}
+              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
             >
-              Generate Reel
+              Watch the Reel →
             </button>
-          ) : (
-            <p className="text-center text-sm text-white/40">
-              Waiting for the host to generate the reel...
-            </p>
-          )}
-        </div>
+            {isInitiator && (
+              <button
+                type="button"
+                onClick={handleGenerateAgain}
+                disabled={resetting}
+                className="w-full py-2 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
+              >
+                {resetting ? 'Resetting...' : 'Generate Again'}
+              </button>
+            )}
+          </>
+        )}
       </div>
     </main>
   )
