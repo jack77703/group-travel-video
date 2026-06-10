@@ -36,8 +36,7 @@ export default function Home() {
                 </h1>
                 <div className="space-y-1 text-lg font-medium leading-8 text-white/65">
                   <p>Everyone brings their best shots&nbsp;&mdash; secretly.</p>
-                  <p>You hit generate.</p>
-                  <p className="text-white/90">Nobody sees it coming.</p>
+                  <p>Nobody sees it coming.</p>
                 </div>
               </div>
             </div>
@@ -55,9 +54,6 @@ export default function Home() {
                     >
                       <div>
                         <p className="text-sm font-bold text-white">{s.memberName}</p>
-                        <p className="font-mono text-xs tracking-widest text-white/40">
-                          {s.roomCode}
-                        </p>
                       </div>
                       <span className="text-xs text-white/30">Rejoin →</span>
                     </Link>
