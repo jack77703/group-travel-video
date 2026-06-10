@@ -3,44 +3,65 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
+import { getInitiatorToken } from '@/lib/session'
+
 export default function SharePage() {
   const router = useRouter()
   const params = useParams()
   const code = (params.code as string).toUpperCase()
-  const [mp4Url, setMp4Url] = useState<string | null>(null)
+  const [displayedUrl, setDisplayedUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [shareError, setShareError] = useState('')
   const [downloaded, setDownloaded] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const isInitiator = !!getInitiatorToken(code)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    fetch(`/api/rooms/${code}/reel`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.mp4_url) setMp4Url(data.mp4_url)
+    let cancelled = false
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/rooms/${code}/reel`)
+        const data = await res.json()
+        if (cancelled) return
+
+        // Always take a real URL when we get one (keeps old video during regeneration)
+        if (data.mp4_url) setDisplayedUrl(data.mp4_url)
         setLoading(false)
-      })
-      .catch(() => setLoading(false))
+
+        // Room is done — stop polling
+        if (data.room_status === 'done') return
+
+        // Room is generating — wait 5s and check again
+        await new Promise<void>((resolve) => setTimeout(resolve, 5000))
+        if (!cancelled) poll()
+      } catch {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    poll()
+    return () => { cancelled = true }
   }, [code])
 
   async function handleNativeShare() {
-    if (!mp4Url) return
+    if (!displayedUrl) return
     setShareError('')
-
     if (navigator.share) {
       try {
-        if (navigator.canShare?.({ url: mp4Url })) {
-          await navigator.share({ url: mp4Url, title: 'Our Surprise Reel' })
+        if (navigator.canShare?.({ url: displayedUrl })) {
+          await navigator.share({ url: displayedUrl, title: 'Our Surprise Reel' })
           return
         }
-        const res = await fetch(mp4Url)
+        const res = await fetch(displayedUrl)
         const blob = await res.blob()
         const file = new File([blob], `surprise-reel-${code}.mp4`, { type: 'video/mp4' })
         if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ files: [file], title: 'Our Surprise Reel' })
           return
         }
-        await navigator.share({ url: mp4Url, title: 'Our Surprise Reel' })
+        await navigator.share({ url: displayedUrl, title: 'Our Surprise Reel' })
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           setShareError('Could not open share sheet.')
@@ -52,8 +73,8 @@ export default function SharePage() {
   }
 
   async function handleDownload() {
-    if (!mp4Url) return
-    const res = await fetch(mp4Url)
+    if (!displayedUrl) return
+    const res = await fetch(displayedUrl)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -64,13 +85,19 @@ export default function SharePage() {
     setDownloaded(true)
   }
 
-  function socialLink(platform: 'threads' | 'twitter' | 'whatsapp') {
-    if (!mp4Url) return '#'
-    const text = encodeURIComponent('Our surprise reel is here 🎬')
-    const url = encodeURIComponent(mp4Url)
-    if (platform === 'threads') return `https://www.threads.net/intent/post?text=${text}%20${url}`
-    if (platform === 'twitter') return `https://twitter.com/intent/tweet?text=${text}&url=${url}`
-    return `https://wa.me/?text=${text}%20${url}`
+  async function handleGenerateAgain() {
+    const initiatorToken = getInitiatorToken(code)
+    if (!initiatorToken) return
+    setResetting(true)
+    try {
+      await fetch(`/api/rooms/${code}/reset`, {
+        method: 'POST',
+        headers: { 'x-initiator-token': initiatorToken },
+      })
+      router.push(`/room/${code}/generate`)
+    } catch {
+      setResetting(false)
+    }
   }
 
   if (loading) {
@@ -81,16 +108,12 @@ export default function SharePage() {
     )
   }
 
-  if (!mp4Url) {
+  if (!displayedUrl) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
         <div className="text-center">
           <p className="text-white/50">Reel not found.</p>
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="mt-4 text-sm text-amber-200 underline"
-          >
+          <button type="button" onClick={() => router.push('/')} className="mt-4 text-sm text-amber-200 underline">
             Go home
           </button>
         </div>
@@ -111,7 +134,7 @@ export default function SharePage() {
         <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-3 shadow-2xl shadow-black/40">
           <video
             ref={videoRef}
-            src={mp4Url}
+            src={displayedUrl}
             controls
             autoPlay
             playsInline
@@ -128,39 +151,12 @@ export default function SharePage() {
             Share
           </button>
 
-          <div className="grid grid-cols-3 gap-2">
-            <a
-              href={socialLink('threads')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.1]"
-            >
-              Threads
-            </a>
-            <a
-              href={socialLink('twitter')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.1]"
-            >
-              Twitter
-            </a>
-            <a
-              href={socialLink('whatsapp')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-white/[0.1]"
-            >
-              WhatsApp
-            </a>
-          </div>
-
           <button
             type="button"
             onClick={handleDownload}
             className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-4 text-lg font-bold text-white transition hover:border-white/25"
           >
-            {downloaded ? 'Downloaded!' : 'Download MP4'}
+            {downloaded ? 'Downloaded!' : 'Download'}
           </button>
 
           {shareError && (
@@ -168,13 +164,16 @@ export default function SharePage() {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => router.push('/create')}
-          className="w-full py-3 text-sm text-white/30 transition hover:text-white/60"
-        >
-          Create another room
-        </button>
+        {isInitiator && (
+          <button
+            type="button"
+            onClick={handleGenerateAgain}
+            disabled={resetting}
+            className="w-full py-3 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
+          >
+            {resetting ? 'Resetting...' : 'Generate Again'}
+          </button>
+        )}
       </div>
     </main>
   )
