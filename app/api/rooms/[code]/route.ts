@@ -26,10 +26,14 @@ export async function GET(
     .eq('room_id', room.id)
     .order('name', { ascending: true })
 
-  const { data: photoCounts } = await supabase
+  const { data: photoCounts, error: photoError } = await supabase
     .from('photos')
     .select('member_id')
     .eq('room_id', room.id)
+
+  console.log('[rooms GET] room.id:', room.id, 'code:', params.code.toUpperCase())
+  console.log('[rooms GET] photoCounts:', JSON.stringify(photoCounts), 'error:', JSON.stringify(photoError))
+  console.log('[rooms GET] members:', JSON.stringify(members?.map(m => m.id)))
 
   const countByMember: Record<string, number> = {}
   for (const p of photoCounts ?? []) {
