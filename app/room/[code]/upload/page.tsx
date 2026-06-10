@@ -169,13 +169,23 @@ export default function UploadPage() {
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={() => router.push(`/room/${code}/lobby`)}
-            className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
-          >
-            {uploaded > 0 ? 'Done - Go to Lobby' : 'Skip for now'}
-          </button>
+          {uploaded > 0 ? (
+            <button
+              type="button"
+              onClick={() => router.push(`/room/${code}/lobby`)}
+              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
+            >
+              Done — Go to Lobby
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => router.push(`/room/${code}/lobby`)}
+              className="w-full py-3 text-sm text-white/30 transition hover:text-white/60"
+            >
+              Skip for now
+            </button>
+          )}
         </div>
       </div>
     </main>

@@ -118,12 +118,28 @@ export default function LobbyPage() {
     <main className="min-h-screen bg-black px-6 py-8 text-white">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col">
         <div className="space-y-8">
-          <div className="space-y-1">
+          <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
               Room {room.code}
             </p>
-            <h1 className="text-4xl font-black tracking-tight">{room.name}</h1>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => router.push('/')}
+                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+              >
+                Home
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/create')}
+                className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+              >
+                New Room
+              </button>
+            </div>
           </div>
+          <h1 className="text-4xl font-black tracking-tight">{room.name}</h1>
 
           <div className="flex-1 space-y-3">
             {room.members.map((member: MemberPublic) => {

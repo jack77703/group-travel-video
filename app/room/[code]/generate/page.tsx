@@ -118,8 +118,8 @@ export default function GeneratePage() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col gap-6">
+    <main className="h-screen overflow-hidden bg-black px-6 py-8 text-white">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-6">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
             Room {code}
@@ -141,7 +141,7 @@ export default function GeneratePage() {
           )}
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {tracks.map((track) => {
             const isSelected = selected?.id === track.id
             const isPreviewing = previewing === track.id
