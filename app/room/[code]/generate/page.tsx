@@ -1,11 +1,11 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { getInitiatorToken } from '@/lib/session'
 
-interface Track {
+type Track = {
   id: string
   name: string
   artist: string
@@ -14,10 +14,37 @@ interface Track {
   image: string
 }
 
+type Animation = 'zoom-in' | 'zoom-out' | 'static'
+
+const MOODS = [
+  { label: 'Ambient', tag: 'ambient' },
+  { label: 'Epic', tag: 'epic' },
+  { label: 'Happy', tag: 'happy' },
+  { label: 'Chill', tag: 'chill' },
+  { label: 'Romantic', tag: 'romantic' },
+  { label: 'Upbeat', tag: 'upbeat' },
+  { label: 'Dark', tag: 'dark' },
+  { label: 'Jazz', tag: 'jazz' },
+  { label: 'Electronic', tag: 'electronic' },
+]
+
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function loadSavedSettings(code: string) {
+  try {
+    const raw = localStorage.getItem(`reel_generate_settings_${code}`)
+    return raw ? (JSON.parse(raw) as { mood: string; track: Track; pace: number; animation: Animation }) : null
+  } catch {
+    return null
+  }
+}
+
+function saveSettings(code: string, s: { mood: string; track: Track; pace: number; animation: Animation }) {
+  localStorage.setItem(`reel_generate_settings_${code}`, JSON.stringify(s))
 }
 
 export default function GeneratePage() {
@@ -25,46 +52,54 @@ export default function GeneratePage() {
   const params = useParams()
   const code = (params.code as string).toUpperCase()
 
-  const [query, setQuery] = useState('')
+  const [selectedMood, setSelectedMood] = useState<string | null>(null)
   const [tracks, setTracks] = useState<Track[]>([])
-  const [searching, setSearching] = useState(false)
+  const [fetchingTracks, setFetchingTracks] = useState(false)
   const [selected, setSelected] = useState<Track | null>(null)
   const [previewing, setPreviewing] = useState<string | null>(null)
+  const [pace, setPace] = useState(2)
+  const [animation, setAnimation] = useState<Animation>('zoom-in')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track ID to pre-select once tracks load (used for Generate Again pre-fill)
+  const pendingTrackIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!getInitiatorToken(code)) {
       router.replace(`/room/${code}/lobby`)
+      return
+    }
+    const saved = loadSavedSettings(code)
+    if (saved) {
+      setPace(saved.pace ?? 2)
+      setAnimation(saved.animation ?? 'zoom-in')
+      if (saved.mood) {
+        pendingTrackIdRef.current = saved.track?.id ?? null
+        setSelectedMood(saved.mood)
+      }
     }
   }, [code, router])
 
-  const search = useCallback(async (q: string) => {
-    setSearching(true)
-    try {
-      const res = await fetch(`/api/music/search?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
-      setTracks(data.tracks ?? [])
-    } catch {
-      setTracks([])
-    } finally {
-      setSearching(false)
-    }
-  }, [])
-
   useEffect(() => {
-    search('')
-  }, [search])
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => search(query), 400)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [query, search])
+    if (!selectedMood) return
+    setFetchingTracks(true)
+    setTracks([])
+    setSelected(null)
+    fetch(`/api/music/search?mood=${selectedMood}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const fetched: Track[] = data.tracks ?? []
+        setTracks(fetched)
+        if (pendingTrackIdRef.current) {
+          const found = fetched.find((t) => t.id === pendingTrackIdRef.current)
+          setSelected(found ?? null)
+          pendingTrackIdRef.current = null
+        }
+      })
+      .catch(() => setTracks([]))
+      .finally(() => setFetchingTracks(false))
+  }, [selectedMood])
 
   function togglePreview(track: Track) {
     if (previewing === track.id) {
@@ -105,10 +140,19 @@ export default function GeneratePage() {
           'Content-Type': 'application/json',
           'x-initiator-token': initiatorToken,
         },
-        body: JSON.stringify({ music_url: selected.url, music_name: `${selected.name} — ${selected.artist}` }),
+        body: JSON.stringify({
+          music_url: selected.url,
+          music_name: `${selected.name} — ${selected.artist}`,
+          photo_duration: pace,
+          animation,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+
+      if (selectedMood) {
+        saveSettings(code, { mood: selectedMood, track: selected, pace, animation })
+      }
       router.push(`/room/${code}/reel`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -119,66 +163,72 @@ export default function GeneratePage() {
 
   return (
     <main className="h-screen overflow-hidden bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-6">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-5">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
             Room {code}
           </p>
-          <h1 className="text-4xl font-black tracking-tight">Pick a track</h1>
-          <p className="text-sm text-white/50">Search and preview before generating.</p>
+          <h1 className="text-4xl font-black tracking-tight">Pick a vibe</h1>
         </div>
 
-        <div className="relative">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by song or artist..."
-            className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 pr-10 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200 focus:ring-4 focus:ring-amber-200/10"
-          />
-          {searching && (
-            <div className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          )}
+        {/* Mood chips */}
+        <div className="flex flex-wrap gap-2">
+          {MOODS.map(({ label, tag }) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setSelectedMood(tag)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                selectedMood === tag
+                  ? 'bg-amber-200 text-black'
+                  : 'border border-white/15 bg-white/[0.06] text-white/70 hover:border-white/30 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
+        {/* Track list */}
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+          {fetchingTracks && (
+            <div className="flex justify-center py-6">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+            </div>
+          )}
+          {!fetchingTracks && !selectedMood && (
+            <p className="py-8 text-center text-sm text-white/30">Select a vibe above</p>
+          )}
+          {!fetchingTracks && selectedMood && tracks.length === 0 && (
+            <p className="py-8 text-center text-sm text-white/30">No tracks found</p>
+          )}
           {tracks.map((track) => {
             const isSelected = selected?.id === track.id
             const isPreviewing = previewing === track.id
-
             return (
               <div
                 key={track.id}
                 onClick={() => setSelected(track)}
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition ${
                   isSelected
-                    ? 'border-white bg-white/10'
+                    ? 'border-amber-200/60 bg-amber-200/10'
                     : 'border-white/10 bg-white/[0.04] hover:border-white/20'
                 }`}
               >
                 {track.image ? (
-                  <img
-                    src={track.image}
-                    alt=""
-                    className="h-10 w-10 flex-shrink-0 rounded-lg object-cover"
-                  />
+                  <img src={track.image} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
                 ) : (
                   <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-white/10" />
                 )}
-
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold leading-tight">{track.name}</p>
                   <p className="truncate text-xs text-white/45">
                     {track.artist} · {formatDuration(track.duration)}
                   </p>
                 </div>
-
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    togglePreview(track)
-                  }}
+                  onClick={(e) => { e.stopPropagation(); togglePreview(track) }}
                   className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
                 >
                   {isPreviewing ? '■' : '▶'}
@@ -186,19 +236,46 @@ export default function GeneratePage() {
               </div>
             )
           })}
-
-          {!searching && tracks.length === 0 && (
-            <p className="py-8 text-center text-sm text-white/30">No tracks found</p>
-          )}
         </div>
 
-        {selected && (
-          <div className="rounded-2xl border border-amber-200/20 bg-amber-200/5 px-4 py-3 text-sm">
-            <p className="text-amber-200/60">Selected</p>
-            <p className="font-semibold">{selected.name}</p>
-            <p className="text-white/50">{selected.artist}</p>
+        {/* Pace slider */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-white/70">Pace</span>
+            <span className="rounded-full bg-white px-3 py-0.5 text-sm font-bold text-black">{pace}s</span>
           </div>
-        )}
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={1}
+            value={pace}
+            onChange={(e) => setPace(Number(e.target.value))}
+            className="w-full accent-amber-200"
+          />
+          <div className="mt-1 flex justify-between text-xs text-white/30">
+            <span>Fast</span>
+            <span>Slow</span>
+          </div>
+        </div>
+
+        {/* Animation picker */}
+        <div className="grid grid-cols-3 gap-2">
+          {(['zoom-in', 'zoom-out', 'static'] as Animation[]).map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => setAnimation(a)}
+              className={`rounded-2xl border py-3 text-sm font-semibold transition ${
+                animation === a
+                  ? 'border-amber-200/60 bg-amber-200/10 text-amber-200'
+                  : 'border-white/10 bg-white/[0.04] text-white/50 hover:border-white/20 hover:text-white/80'
+              }`}
+            >
+              {a === 'zoom-in' ? 'Zoom In' : a === 'zoom-out' ? 'Zoom Out' : 'Static'}
+            </button>
+          ))}
+        </div>
 
         {error && (
           <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
