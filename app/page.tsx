@@ -53,7 +53,8 @@ export default function Home() {
                       className="flex flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.09]"
                     >
                       <div>
-                        <p className="text-sm font-bold text-white">{s.memberName}</p>
+                        <p className="text-sm font-bold text-white">{s.roomName}</p>
+                        <p className="text-xs text-white/40">You joined as {s.memberName}</p>
                       </div>
                       <span className="text-xs text-white/30">Rejoin →</span>
                     </Link>
