@@ -53,6 +53,7 @@ export default function CreatePage() {
         roomCode: data.code,
         memberId: joinData.member_id,
         memberName: joinData.name,
+        roomName: name,
       })
       router.push(`/room/${data.code}/upload`)
     } catch (err: unknown) {
