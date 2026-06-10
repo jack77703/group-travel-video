@@ -56,7 +56,7 @@ export async function POST(
   const PHOTO_DURATION = 3
 
   const creatomate = new CreatomateClient(process.env.CREATOMATE_API_KEY!)
-  const renders = await creatomate.render({
+  const renders = await creatomate.startRender({
     source: {
       output_format: 'mp4',
       width: 1080,
@@ -91,15 +91,21 @@ export async function POST(
   })
 
   const render_id = renders[0].id
-  console.log('[generate] render_id:', render_id, 'room.id:', room.id)
 
   await supabase
     .from('rooms')
     .update({ status: 'generating', music_genre: music_name ?? music_url })
     .eq('id', room.id)
 
-  const { error: reelInsertError } = await supabase.from('reels').insert({ room_id: room.id, render_id, status: 'processing' })
-  console.log('[generate] reel insert error:', JSON.stringify(reelInsertError))
+  const { error: reelInsertError } = await supabase
+    .from('reels')
+    .insert({ room_id: room.id, render_id, status: 'processing' })
+
+  if (reelInsertError) {
+    console.error('[generate] reel insert failed:', reelInsertError)
+    await supabase.from('rooms').update({ status: 'open' }).eq('id', room.id)
+    return NextResponse.json({ error: 'Failed to start reel generation' }, { status: 500 })
+  }
 
   return NextResponse.json({ render_id, status: 'processing' })
 }
