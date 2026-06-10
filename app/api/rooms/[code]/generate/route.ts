@@ -53,7 +53,7 @@ export async function POST(
     if (data?.signedUrl) photoUrls.push(data.signedUrl)
   }
 
-  const PHOTO_DURATION = 3
+  const PHOTO_DURATION = 1
 
   const creatomate = new CreatomateClient(process.env.CREATOMATE_API_KEY!)
   const renders = await creatomate.startRender({

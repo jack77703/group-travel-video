@@ -159,7 +159,7 @@ export default function LobbyPage() {
           </div>
           <h1 className="text-4xl font-black tracking-tight">{room.name}</h1>
           <p className="text-sm text-white/40">
-            {room.members.length} member{room.members.length !== 1 ? 's' : ''} · up to 20
+            {room.members.length} / {Math.min(20, Math.floor(60 / room.max_photos_per_member))} members
           </p>
 
           <div className="flex-1 space-y-3">

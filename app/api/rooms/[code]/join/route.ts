@@ -32,8 +32,9 @@ export async function POST(
     .select('id', { count: 'exact', head: true })
     .eq('room_id', room.id)
 
-  if ((memberCount ?? 0) >= 20) {
-    return NextResponse.json({ error: 'Room is full (20 members max)' }, { status: 409 })
+  const maxMembers = Math.min(20, Math.floor(60 / room.max_photos_per_member))
+  if ((memberCount ?? 0) >= maxMembers) {
+    return NextResponse.json({ error: `Room is full (${maxMembers} members max for this room)` }, { status: 409 })
   }
 
   const { data: existing } = await supabase
