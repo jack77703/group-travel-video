@@ -52,6 +52,7 @@ export default function SharePage() {
       try {
         if (navigator.canShare?.({ url: displayedUrl })) {
           await navigator.share({ url: displayedUrl, title: 'Our Reveel' })
+          router.push('/')
           return
         }
         const res = await fetch(displayedUrl)
@@ -59,9 +60,11 @@ export default function SharePage() {
         const file = new File([blob], `reveel-${code}.mp4`, { type: 'video/mp4' })
         if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ files: [file], title: 'Our Reveel' })
+          router.push('/')
           return
         }
         await navigator.share({ url: displayedUrl, title: 'Our Reveel' })
+        router.push('/')
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           setShareError('Could not open share sheet.')
@@ -82,7 +85,7 @@ export default function SharePage() {
     link.download = `reveel-${code}.mp4`
     link.click()
     URL.revokeObjectURL(url)
-    setDownloaded(true)
+    router.push('/')
   }
 
   async function handleGenerateAgain() {
