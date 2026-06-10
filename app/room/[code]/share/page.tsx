@@ -51,17 +51,17 @@ export default function SharePage() {
     if (navigator.share) {
       try {
         if (navigator.canShare?.({ url: displayedUrl })) {
-          await navigator.share({ url: displayedUrl, title: 'Our Surprise Reel' })
+          await navigator.share({ url: displayedUrl, title: 'Our Reveel' })
           return
         }
         const res = await fetch(displayedUrl)
         const blob = await res.blob()
-        const file = new File([blob], `surprise-reel-${code}.mp4`, { type: 'video/mp4' })
+        const file = new File([blob], `reveel-${code}.mp4`, { type: 'video/mp4' })
         if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Our Surprise Reel' })
+          await navigator.share({ files: [file], title: 'Our Reveel' })
           return
         }
-        await navigator.share({ url: displayedUrl, title: 'Our Surprise Reel' })
+        await navigator.share({ url: displayedUrl, title: 'Our Reveel' })
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           setShareError('Could not open share sheet.')
@@ -79,7 +79,7 @@ export default function SharePage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `surprise-reel-${code}.mp4`
+    link.download = `reveel-${code}.mp4`
     link.click()
     URL.revokeObjectURL(url)
     setDownloaded(true)
