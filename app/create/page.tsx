@@ -39,7 +39,10 @@ export default function CreatePage() {
 
       const joinRes = await fetch(`/api/rooms/${data.code}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-initiator-token': data.created_by_token,
+        },
         body: JSON.stringify({ name: initiatorName }),
       })
       const joinData = await joinRes.json()

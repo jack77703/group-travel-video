@@ -42,6 +42,7 @@ export interface MemberPublic {
   id: string
   name: string
   photos_uploaded: number
+  is_initiator: boolean
 }
 
 export interface RoomPublic {

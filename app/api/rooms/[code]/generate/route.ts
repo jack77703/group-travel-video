@@ -1,7 +1,6 @@
 import { Client as CreatomateClient } from 'creatomate'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { MUSIC_GENRES, MusicGenre } from '@/lib/music'
 import { createServerClient } from '@/lib/supabase-server'
 
 export async function POST(
@@ -9,13 +8,13 @@ export async function POST(
   { params }: { params: { code: string } }
 ) {
   const initiator_token = request.headers.get('x-initiator-token')
-  const { music_genre } = await request.json()
+  const { music_url, music_name } = await request.json()
 
   if (!initiator_token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!music_genre || !(music_genre in MUSIC_GENRES)) {
-    return NextResponse.json({ error: 'Invalid music genre' }, { status: 400 })
+  if (!music_url) {
+    return NextResponse.json({ error: 'No music track selected' }, { status: 400 })
   }
 
   const supabase = createServerClient()
@@ -54,7 +53,6 @@ export async function POST(
     if (data?.signedUrl) photoUrls.push(data.signedUrl)
   }
 
-  const musicUrl = MUSIC_GENRES[music_genre as MusicGenre].url
   const PHOTO_DURATION = 3
 
   const creatomate = new CreatomateClient(process.env.CREATOMATE_API_KEY!)
@@ -67,7 +65,7 @@ export async function POST(
       elements: [
         {
           type: 'audio',
-          source: musicUrl,
+          source: music_url,
           duration: PHOTO_DURATION * photoUrls.length,
           audio_fade_out: 2,
         },
@@ -96,7 +94,7 @@ export async function POST(
 
   await supabase
     .from('rooms')
-    .update({ status: 'generating', music_genre })
+    .update({ status: 'generating', music_genre: music_name ?? music_url })
     .eq('id', room.id)
 
   await supabase.from('reels').insert({ room_id: room.id, render_id, status: 'processing' })

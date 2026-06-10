@@ -6,6 +6,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { code: string } }
 ) {
+  const initiator_token = request.headers.get('x-initiator-token')
   const { name } = await request.json()
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -15,7 +16,7 @@ export async function POST(
 
   const { data: room } = await supabase
     .from('rooms')
-    .select('id, status, max_photos_per_member')
+    .select('id, status, max_photos_per_member, created_by_token')
     .eq('code', params.code.toUpperCase())
     .single()
 
@@ -42,9 +43,11 @@ export async function POST(
     Date.now() + 30 * 24 * 60 * 60 * 1000
   ).toISOString()
 
+  const is_initiator = !!(initiator_token && initiator_token === room.created_by_token)
+
   const { data: member, error } = await supabase
     .from('members')
-    .insert({ room_id: room.id, name: name.trim(), session_token, session_token_expires_at })
+    .insert({ room_id: room.id, name: name.trim(), session_token, session_token_expires_at, is_initiator })
     .select()
     .single()
 
