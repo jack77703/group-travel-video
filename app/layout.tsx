@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Group Travel Video",
-  description: "Group travel video generator — mobile web MVP",
+  title: "Reveel",
+  description: "Everyone uploads secretly. You hit generate. They're surprised.",
 };
 
 export default function RootLayout({
