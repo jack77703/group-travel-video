@@ -64,7 +64,7 @@ export default function CreatePage() {
   }
 
   return (
-    <main className="h-dvh overflow-y-auto bg-black px-6 py-6 text-white">
+    <main className="h-dvh overflow-hidden bg-black px-6 py-6 text-white">
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center">
         <div className="space-y-6">
           <div className="space-y-2">

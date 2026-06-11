@@ -18,7 +18,7 @@ export default function Home() {
   }
 
   return (
-    <main className="h-dvh overflow-y-auto bg-black px-6 text-white">
+    <main className="h-dvh overflow-hidden bg-black px-6 text-white">
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center py-8">
         <div className="relative">
           <div className="absolute -left-16 -top-20 h-48 w-48 rounded-full bg-amber-300/20 blur-3xl" />

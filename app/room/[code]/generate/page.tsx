@@ -168,17 +168,17 @@ export default function GeneratePage() {
           <h1 className="text-3xl font-black tracking-tight">Pick a vibe</h1>
         </div>
 
-        {/* Mood chips — horizontal scroll */}
-        <div className="flex-shrink-0 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {/* Mood grid — 3×3, all visible at once */}
+        <div className="flex-shrink-0 grid grid-cols-3 gap-2">
           {MOODS.map(({ label, tag }) => (
             <button
               key={tag}
               type="button"
               onClick={() => setSelectedMood(tag)}
-              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+              className={`rounded-2xl py-3 text-sm font-semibold transition ${
                 selectedMood === tag
                   ? 'bg-amber-200 text-black'
-                  : 'border border-white/15 bg-white/[0.06] text-white/70 hover:border-white/30 hover:text-white'
+                  : 'border border-white/15 bg-white/[0.06] text-white/60 hover:border-white/30 hover:text-white'
               }`}
             >
               {label}
