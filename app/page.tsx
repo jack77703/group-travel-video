@@ -35,8 +35,8 @@ export default function Home() {
                   Reveel
                 </h1>
                 <div className="space-y-1 text-lg font-medium leading-8 text-white/65">
-                  <p>Everyone brings their best shots&nbsp;&mdash; secretly.</p>
-                  <p>Nobody sees it coming.</p>
+                  <p>Bring your best shots in secret.</p>
+                  <p>Nobody sees it coming 🤫</p>
                 </div>
               </div>
             </div>
