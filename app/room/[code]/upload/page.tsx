@@ -128,21 +128,15 @@ export default function UploadPage() {
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
         {/* Header — fixed */}
-        <div className="flex-shrink-0 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
-            Room {code}
-          </p>
-          <h1 className="text-3xl font-black tracking-tight">Your Photos</h1>
-          <p className="text-sm leading-6 text-white/55">
-            Add your favorite shots. Nobody else sees them before the reel reveal.
-          </p>
+        <div className="flex-shrink-0 flex items-center justify-between">
+          <h1 className="text-2xl font-black tracking-tight">Your shots</h1>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold text-white/60">
+            {photos.length} / {maxPhotos}
+          </span>
         </div>
 
         {/* Scrollable content area */}
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto space-y-4">
-          <p className="text-sm text-white/40">
-            {photos.length} / {maxPhotos} selected
-          </p>
 
           {photos.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
@@ -204,7 +198,7 @@ export default function UploadPage() {
             disabled={!readyToUpload}
             className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-30"
           >
-            {uploading ? 'Uploading...' : "I'm ready"}
+            {uploading ? 'Uploading...' : 'Upload'}
           </button>
         </div>
 

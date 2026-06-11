@@ -25,38 +25,30 @@ export default function Home() {
           <div className="absolute -right-20 top-24 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
 
           <div className="relative space-y-8">
-            <div className="space-y-5">
-              <p className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
-                upload secretly
-                <span className="text-amber-300">↗</span>
-              </p>
-              <div className="space-y-4">
-                <h1 className="text-5xl font-black leading-[0.95] tracking-tight">
-                  Reveel
-                </h1>
-                <div className="space-y-1 text-lg font-medium leading-8 text-white/65">
-                  <p>Bring your best shots in secret.</p>
-                  <p>Nobody sees it coming 🤫</p>
-                </div>
-              </div>
+            <div className="space-y-3">
+              <h1 className="text-5xl font-black leading-[0.95] tracking-tight">Reveel</h1>
+              <p className="text-base text-white/55">Upload secretly. Nobody sees it coming.</p>
             </div>
 
             {sessions.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/30">
                   Your rooms
                 </p>
                 {sessions.map((s) => (
                   <div key={s.roomCode} className="flex items-center gap-2">
                     <Link
                       href={`/room/${s.roomCode}/lobby`}
-                      className="flex flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:border-white/20 hover:bg-white/[0.09]"
+                      className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 transition active:bg-white/[0.09]"
                     >
-                      <div>
-                        <p className="text-sm font-bold text-white">{s.roomName}</p>
-                        <p className="text-xs text-white/40">You joined as {s.memberName}</p>
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-200/15 text-sm font-bold text-amber-200">
+                        {s.roomName.slice(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-xs text-white/30">Rejoin →</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-white">{s.roomName}</p>
+                        <p className="text-xs text-white/35">as {s.memberName}</p>
+                      </div>
+                      <span className="text-xs text-white/25">Open →</span>
                     </Link>
                     <button
                       type="button"
@@ -73,9 +65,9 @@ export default function Home() {
 
             <Link
               href="/create"
-              className="block w-full rounded-2xl bg-white px-5 py-4 text-center text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
+              className="block w-full rounded-2xl bg-white px-5 py-4 text-center text-base font-bold text-black transition hover:bg-amber-100 active:scale-[0.99]"
             >
-              Create a Reel Room
+              New Room
             </Link>
           </div>
         </div>

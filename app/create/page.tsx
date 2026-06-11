@@ -67,46 +67,35 @@ export default function CreatePage() {
     <main className="h-dvh overflow-hidden bg-black px-6 py-6 text-white">
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center">
         <div className="space-y-6">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
-              Start the surprise
-            </p>
-            <h1 className="text-3xl font-black tracking-tight">Create a Reel Room</h1>
-            <p className="text-sm leading-6 text-white/55">
-              Name the moment, set how many photos each person must upload, then share the room.
-            </p>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-black tracking-tight">New Room</h1>
+            <p className="text-sm text-white/40">Name the moment, pick a photo count, then invite everyone.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">Room name</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Bali Trip 2026"
-                required
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200 focus:ring-4 focus:ring-amber-200/10"
-              />
-            </div>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Room name — e.g. Bali Trip"
+              required
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200/60 focus:ring-4 focus:ring-amber-200/10"
+            />
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">Your name</label>
-              <input
-                value={initiatorName}
-                onChange={(e) => setInitiatorName(e.target.value)}
-                placeholder="e.g. Jack"
-                required
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200 focus:ring-4 focus:ring-amber-200/10"
-              />
-            </div>
+            <input
+              value={initiatorName}
+              onChange={(e) => setInitiatorName(e.target.value)}
+              placeholder="Your name"
+              required
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200/60 focus:ring-4 focus:ring-amber-200/10"
+            />
 
-            <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-4">
-              <label className="mb-3 flex items-center justify-between text-sm font-medium text-white/70">
-                <span>Required photos per person</span>
-                <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-black">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm text-white/55">Photos per person</span>
+                <span className="rounded-full bg-amber-200 px-3 py-0.5 text-sm font-bold text-black">
                   {requiredPhotos}
                 </span>
-              </label>
+              </div>
               <input
                 type="range"
                 min={1}
@@ -115,8 +104,8 @@ export default function CreatePage() {
                 onChange={(e) => setRequiredPhotos(Number(e.target.value))}
                 className="w-full accent-amber-200"
               />
-              <p className="mt-2 text-xs text-white/35">
-                Everyone must upload exactly {requiredPhotos} photo{requiredPhotos !== 1 ? 's' : ''}. Up to {Math.min(20, Math.floor(60 / requiredPhotos))} members can join.
+              <p className="mt-2 text-xs text-white/30">
+                Up to {Math.min(20, Math.floor(60 / requiredPhotos))} members
               </p>
             </div>
 
@@ -129,9 +118,9 @@ export default function CreatePage() {
             <button
               type="submit"
               disabled={loading || !name.trim() || !initiatorName.trim()}
-              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-2xl bg-white px-5 py-4 text-base font-bold text-black transition hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {loading ? 'Creating...' : 'Create Room'}
+              {loading ? 'Creating...' : 'Create'}
             </button>
           </form>
         </div>

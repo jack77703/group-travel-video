@@ -55,29 +55,26 @@ export default function JoinPage() {
     <main className="h-dvh overflow-hidden bg-black px-6 py-6 text-white">
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center">
         <div className="space-y-6">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
-              Room
-            </p>
+          <div className="space-y-4">
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/40">
-              <p className="text-sm text-white/50">Secret upload code</p>
-              <h1 className="mt-2 font-mono text-5xl font-black tracking-[0.18em] text-amber-100">
+              <p className="text-xs text-white/35 uppercase tracking-[0.2em]">Room code</p>
+              <h1 className="mt-1 font-mono text-5xl font-black tracking-[0.18em] text-amber-100">
                 {code}
               </h1>
             </div>
-            <p className="text-sm leading-6 text-white/65">
-              Enter your name to join. Your uploads stay hidden until the final reel is revealed.
+            <p className="text-sm text-white/45">
+              Upload secretly. Everything stays hidden until the big reveal.
             </p>
           </div>
 
-          <form onSubmit={handleJoin} className="space-y-4">
+          <form onSubmit={handleJoin} className="space-y-3">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
               required
               autoFocus
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-lg text-white outline-none transition placeholder:text-white/25 focus:border-amber-200 focus:ring-4 focus:ring-amber-200/10"
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-base text-white outline-none transition placeholder:text-white/25 focus:border-amber-200/60 focus:ring-4 focus:ring-amber-200/10"
             />
 
             {error && (
@@ -89,9 +86,9 @@ export default function JoinPage() {
             <button
               type="submit"
               disabled={loading || !name.trim()}
-              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-2xl bg-white px-5 py-4 text-base font-bold text-black transition hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {loading ? 'Joining...' : 'Join Room'}
+              {loading ? 'Joining...' : 'Join'}
             </button>
           </form>
         </div>

@@ -154,36 +154,34 @@ export default function LobbyPage() {
       </div>
 
       {/* Member list — only this area scrolls */}
-      <div className="mt-5 min-h-0 flex-1 space-y-2 overflow-y-auto">
+      <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
         {room.members.map((member: MemberPublic) => {
           const hasUploaded = member.photos_uploaded > 0
+          const initials = member.name.trim().split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
           return (
             <div
               key={member.id}
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"
+              className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.05] px-4 py-3"
             >
-              <div>
+              <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${hasUploaded ? 'bg-amber-200/20 text-amber-200' : 'bg-white/10 text-white/50'}`}>
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold">{member.name}</p>
+                  <p className="truncate text-sm font-semibold">{member.name}</p>
                   {member.is_initiator && (
-                    <span className="rounded-full bg-amber-200/15 px-2 py-0.5 text-xs font-semibold text-amber-200">
+                    <span className="flex-shrink-0 rounded-full bg-amber-200/15 px-2 py-0.5 text-xs font-semibold text-amber-200">
                       Host
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-white/40">
-                  {member.photos_uploaded} photo{member.photos_uploaded === 1 ? '' : 's'}
+                <p className="text-xs text-white/35">
+                  {hasUploaded ? `${member.photos_uploaded} photo${member.photos_uploaded === 1 ? '' : 's'} ready` : 'waiting…'}
                 </p>
               </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-bold ${
-                  hasUploaded
-                    ? 'bg-emerald-300/15 text-emerald-200'
-                    : 'bg-white/10 text-white/40'
-                }`}
-              >
-                {hasUploaded ? 'uploaded' : 'waiting'}
-              </span>
+              {hasUploaded && (
+                <div className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400" />
+              )}
             </div>
           )
         })}
