@@ -163,22 +163,19 @@ export default function GeneratePage() {
 
   return (
     <main className="h-screen overflow-hidden bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-5">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
-            Room {code}
-          </p>
-          <h1 className="text-4xl font-black tracking-tight">Pick a vibe</h1>
+      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
+        <div className="flex-shrink-0">
+          <h1 className="text-3xl font-black tracking-tight">Pick a vibe</h1>
         </div>
 
-        {/* Mood chips */}
-        <div className="flex flex-wrap gap-2">
+        {/* Mood chips — horizontal scroll */}
+        <div className="flex-shrink-0 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {MOODS.map(({ label, tag }) => (
             <button
               key={tag}
               type="button"
               onClick={() => setSelectedMood(tag)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                 selectedMood === tag
                   ? 'bg-amber-200 text-black'
                   : 'border border-white/15 bg-white/[0.06] text-white/70 hover:border-white/30 hover:text-white'
@@ -239,8 +236,8 @@ export default function GeneratePage() {
         </div>
 
         {/* Pace slider */}
-        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2">
+          <div className="mb-1.5 flex items-center justify-between">
             <span className="text-sm font-medium text-white/70">Pace</span>
             <span className="rounded-full bg-white px-3 py-0.5 text-sm font-bold text-black">{pace}s</span>
           </div>
@@ -253,20 +250,20 @@ export default function GeneratePage() {
             onChange={(e) => setPace(Number(e.target.value))}
             className="w-full accent-amber-200"
           />
-          <div className="mt-1 flex justify-between text-xs text-white/30">
+          <div className="mt-0.5 flex justify-between text-xs text-white/30">
             <span>Fast</span>
             <span>Slow</span>
           </div>
         </div>
 
         {/* Animation picker */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="flex-shrink-0 grid grid-cols-3 gap-2">
           {(['zoom-in', 'zoom-out', 'static'] as Animation[]).map((a) => (
             <button
               key={a}
               type="button"
               onClick={() => setAnimation(a)}
-              className={`rounded-2xl border py-3 text-sm font-semibold transition ${
+              className={`rounded-2xl border py-2 text-sm font-semibold transition ${
                 animation === a
                   ? 'border-amber-200/60 bg-amber-200/10 text-amber-200'
                   : 'border-white/10 bg-white/[0.04] text-white/50 hover:border-white/20 hover:text-white/80'
@@ -278,7 +275,7 @@ export default function GeneratePage() {
         </div>
 
         {error && (
-          <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <p className="flex-shrink-0 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </p>
         )}
@@ -287,7 +284,7 @@ export default function GeneratePage() {
           type="button"
           onClick={handleGenerate}
           disabled={!selected || loading}
-          className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex-shrink-0 w-full rounded-2xl bg-white px-5 py-3 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading ? 'Starting generation...' : 'Generate Reel'}
         </button>

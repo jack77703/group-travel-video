@@ -125,19 +125,21 @@ export default function UploadPage() {
   const readyToUpload = photos.length === maxPhotos && !uploading
 
   return (
-    <main className="min-h-screen bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col">
-        <div className="space-y-8">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
-              Room {code}
-            </p>
-            <h1 className="text-4xl font-black tracking-tight">Your Photos</h1>
-            <p className="text-sm leading-6 text-white/55">
-              Add your favorite shots. Nobody else sees them before the reel reveal.
-            </p>
-          </div>
+    <main className="flex h-screen flex-col bg-black px-6 py-8 text-white">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col">
+        {/* Header — fixed */}
+        <div className="flex-shrink-0 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
+            Room {code}
+          </p>
+          <h1 className="text-3xl font-black tracking-tight">Your Photos</h1>
+          <p className="text-sm leading-6 text-white/55">
+            Add your favorite shots. Nobody else sees them before the reel reveal.
+          </p>
+        </div>
 
+        {/* Scrollable content area */}
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto space-y-4">
           <p className="text-sm text-white/40">
             {photos.length} / {maxPhotos} selected
           </p>
@@ -181,27 +183,11 @@ export default function UploadPage() {
               type="button"
               onClick={() => addInputRef.current?.click()}
               disabled={uploading}
-              className="w-full rounded-[2rem] border-2 border-dashed border-white/20 bg-white/[0.04] px-5 py-10 text-center text-base font-bold text-white/65 transition hover:border-amber-200/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-[2rem] border-2 border-dashed border-white/20 bg-white/[0.04] px-5 py-6 text-center text-base font-bold text-white/65 transition hover:border-amber-200/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               + Add photos ({maxPhotos - photos.length} left)
             </button>
           )}
-
-          <input
-            ref={addInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => handleAddFiles(e.target.files)}
-          />
-          <input
-            ref={replaceInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => handleReplaceFile(e.target.files)}
-          />
 
           {error && (
             <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -210,7 +196,8 @@ export default function UploadPage() {
           )}
         </div>
 
-        <div className="mt-auto pt-8">
+        {/* Fixed bottom CTA */}
+        <div className="mt-4 flex-shrink-0">
           <button
             type="button"
             onClick={handleReady}
@@ -220,6 +207,22 @@ export default function UploadPage() {
             {uploading ? 'Uploading...' : "I'm ready"}
           </button>
         </div>
+
+        <input
+          ref={addInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => handleAddFiles(e.target.files)}
+        />
+        <input
+          ref={replaceInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handleReplaceFile(e.target.files)}
+        />
       </div>
     </main>
   )

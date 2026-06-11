@@ -52,10 +52,10 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center">
-        <div className="space-y-8">
-          <div className="space-y-4">
+    <main className="h-screen overflow-y-auto bg-black px-6 py-6 text-white">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center">
+        <div className="space-y-6">
+          <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
               Room
             </p>
@@ -65,7 +65,7 @@ export default function JoinPage() {
                 {code}
               </h1>
             </div>
-            <p className="text-base leading-7 text-white/65">
+            <p className="text-sm leading-6 text-white/65">
               Enter your name to join. Your uploads stay hidden until the final reel is revealed.
             </p>
           </div>

@@ -64,20 +64,20 @@ export default function CreatePage() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center">
-        <div className="space-y-8">
-          <div className="space-y-3">
+    <main className="h-screen overflow-y-auto bg-black px-6 py-6 text-white">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center">
+        <div className="space-y-6">
+          <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
               Start the surprise
             </p>
-            <h1 className="text-4xl font-black tracking-tight">Create a Reel Room</h1>
+            <h1 className="text-3xl font-black tracking-tight">Create a Reel Room</h1>
             <p className="text-sm leading-6 text-white/55">
               Name the moment, set how many photos each person must upload, then share the room.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-white/70">Room name</label>
               <input

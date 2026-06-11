@@ -12,7 +12,6 @@ export default function SharePage() {
   const [displayedUrl, setDisplayedUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [shareError, setShareError] = useState('')
-  const [downloaded, setDownloaded] = useState(false)
   const [resetting, setResetting] = useState(false)
   const isInitiator = !!getInitiatorToken(code)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -26,14 +25,11 @@ export default function SharePage() {
         const data = await res.json()
         if (cancelled) return
 
-        // Always take a real URL when we get one (keeps old video during regeneration)
         if (data.mp4_url) setDisplayedUrl(data.mp4_url)
         setLoading(false)
 
-        // Room is done — stop polling
         if (data.room_status === 'done') return
 
-        // Room is generating — wait 5s and check again
         await new Promise<void>((resolve) => setTimeout(resolve, 5000))
         if (!cancelled) poll()
       } catch {
@@ -105,7 +101,7 @@ export default function SharePage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black">
+      <main className="flex h-screen items-center justify-center bg-black">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent" />
       </main>
     )
@@ -113,7 +109,7 @@ export default function SharePage() {
 
   if (!displayedUrl) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
+      <main className="flex h-screen items-center justify-center bg-black px-6 text-white">
         <div className="text-center">
           <p className="text-white/50">Reel not found.</p>
           <button type="button" onClick={() => router.push('/')} className="mt-4 text-sm text-amber-200 underline">
@@ -125,27 +121,27 @@ export default function SharePage() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col gap-6">
-        <div className="space-y-1 text-center">
+    <main className="flex h-screen flex-col bg-black px-6 py-8 text-white">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4">
+        <div className="flex-shrink-0 space-y-1 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
             Room {code}
           </p>
-          <h1 className="text-4xl font-black tracking-tight">The reveal is ready</h1>
+          <h1 className="text-2xl font-black tracking-tight">The reveal is ready</h1>
         </div>
 
-        <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-3 shadow-2xl shadow-black/40">
+        <div className="min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-3 shadow-2xl shadow-black/40">
           <video
             ref={videoRef}
             src={displayedUrl}
             controls
             autoPlay
             playsInline
-            className="aspect-[9/16] w-full rounded-[1.5rem] bg-black object-cover"
+            className="h-full w-full rounded-[1.5rem] bg-black object-cover"
           />
         </div>
 
-        <div className="space-y-3">
+        <div className="flex-shrink-0 space-y-3">
           <button
             type="button"
             onClick={handleNativeShare}
@@ -159,7 +155,7 @@ export default function SharePage() {
             onClick={handleDownload}
             className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-4 text-lg font-bold text-white transition hover:border-white/25"
           >
-            {downloaded ? 'Downloaded!' : 'Download'}
+            Download
           </button>
 
           {shareError && (
@@ -172,7 +168,7 @@ export default function SharePage() {
             type="button"
             onClick={handleGenerateAgain}
             disabled={resetting}
-            className="w-full py-3 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
+            className="flex-shrink-0 w-full py-2 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
           >
             {resetting ? 'Resetting...' : 'Generate Again'}
           </button>

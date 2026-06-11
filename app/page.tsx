@@ -18,13 +18,13 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-black px-6 text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center py-12">
+    <main className="h-screen overflow-y-auto bg-black px-6 text-white">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center py-8">
         <div className="relative">
           <div className="absolute -left-16 -top-20 h-48 w-48 rounded-full bg-amber-300/20 blur-3xl" />
           <div className="absolute -right-20 top-24 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
 
-          <div className="relative space-y-10">
+          <div className="relative space-y-8">
             <div className="space-y-5">
               <p className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">
                 upload secretly
