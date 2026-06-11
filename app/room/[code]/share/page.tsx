@@ -122,14 +122,7 @@ export default function SharePage() {
 
   return (
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
-      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4">
-        <div className="flex-shrink-0 space-y-1 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">
-            Room {code}
-          </p>
-          <h1 className="text-2xl font-black tracking-tight">The reveal is ready</h1>
-        </div>
-
+      <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
         <div className="min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-3 shadow-2xl shadow-black/40">
           <video
             ref={videoRef}
@@ -158,21 +151,21 @@ export default function SharePage() {
             Download
           </button>
 
+          {isInitiator && (
+            <button
+              type="button"
+              onClick={handleGenerateAgain}
+              disabled={resetting}
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-lg font-bold text-white/50 transition hover:border-white/20 hover:text-white/80 disabled:opacity-40"
+            >
+              {resetting ? 'Resetting...' : 'Generate Again'}
+            </button>
+          )}
+
           {shareError && (
             <p className="text-center text-sm text-red-300">{shareError}</p>
           )}
         </div>
-
-        {isInitiator && (
-          <button
-            type="button"
-            onClick={handleGenerateAgain}
-            disabled={resetting}
-            className="flex-shrink-0 w-full py-2 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
-          >
-            {resetting ? 'Resetting...' : 'Generate Again'}
-          </button>
-        )}
       </div>
     </main>
   )
