@@ -191,6 +191,16 @@ export default function LobbyPage() {
 
       {/* Footer — three states */}
       <div className="mt-5 flex-shrink-0 space-y-3">
+        {isInitiator && (
+          <button
+            type="button"
+            onClick={handleShareInvite}
+            className="w-full rounded-2xl border border-amber-200/40 bg-amber-200/10 px-5 py-3 text-base font-bold text-amber-200 transition hover:bg-amber-200/20 active:scale-[0.99]"
+          >
+            {copied ? 'Link copied!' : 'Invite friends ↗'}
+          </button>
+        )}
+
         {room.status === 'open' && isInitiator && (
           <button
             type="button"
@@ -235,16 +245,6 @@ export default function LobbyPage() {
               </button>
             )}
           </>
-        )}
-
-        {isInitiator && (
-          <button
-            type="button"
-            onClick={handleShareInvite}
-            className="w-full rounded-2xl border border-amber-200/40 bg-amber-200/10 px-5 py-3 text-base font-bold text-amber-200 transition hover:bg-amber-200/20 active:scale-[0.99]"
-          >
-            {copied ? 'Link copied!' : 'Invite friends ↗'}
-          </button>
         )}
       </div>
     </main>
