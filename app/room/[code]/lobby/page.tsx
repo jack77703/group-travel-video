@@ -94,7 +94,7 @@ export default function LobbyPage() {
 
   if (loading || !room) {
     return (
-      <main className="flex h-screen items-center justify-center bg-black px-6 text-white">
+      <main className="flex h-dvh items-center justify-center bg-black px-6 text-white">
         <p className="text-white/45">Loading...</p>
       </main>
     )
@@ -102,7 +102,7 @@ export default function LobbyPage() {
 
   if (error) {
     return (
-      <main className="flex h-screen items-center justify-center bg-black px-6 text-white">
+      <main className="flex h-dvh items-center justify-center bg-black px-6 text-white">
         <p className="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
         </p>
@@ -114,7 +114,7 @@ export default function LobbyPage() {
   const allZero = room.members.every((m: MemberPublic) => m.photos_uploaded === 0)
 
   return (
-    <main className="flex h-screen flex-col bg-black px-6 py-8 text-white">
+    <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       {/* Top bar */}
       <div className="flex flex-shrink-0 items-center justify-between">
         <button

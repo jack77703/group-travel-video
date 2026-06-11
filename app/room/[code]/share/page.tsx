@@ -101,7 +101,7 @@ export default function SharePage() {
 
   if (loading) {
     return (
-      <main className="flex h-screen items-center justify-center bg-black">
+      <main className="flex h-dvh items-center justify-center bg-black">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent" />
       </main>
     )
@@ -109,7 +109,7 @@ export default function SharePage() {
 
   if (!displayedUrl) {
     return (
-      <main className="flex h-screen items-center justify-center bg-black px-6 text-white">
+      <main className="flex h-dvh items-center justify-center bg-black px-6 text-white">
         <div className="text-center">
           <p className="text-white/50">Reel not found.</p>
           <button type="button" onClick={() => router.push('/')} className="mt-4 text-sm text-amber-200 underline">
@@ -121,7 +121,7 @@ export default function SharePage() {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-black px-6 py-8 text-white">
+    <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col gap-4">
         <div className="flex-shrink-0 space-y-1 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/80">

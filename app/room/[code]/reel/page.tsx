@@ -43,7 +43,7 @@ export default function ReelPage() {
   }, [code, router])
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-black px-6 text-white">
+    <main className="flex h-dvh flex-col items-center justify-center bg-black px-6 text-white">
       <div className="w-full max-w-sm space-y-5 text-center">
         {status === 'failed' || error ? (
           <div className="rounded-[2rem] border border-red-400/20 bg-red-500/10 px-5 py-8">

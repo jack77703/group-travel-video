@@ -162,7 +162,7 @@ export default function GeneratePage() {
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-black px-6 py-8 text-white">
+    <main className="h-dvh overflow-hidden bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
         <div className="flex-shrink-0">
           <h1 className="text-3xl font-black tracking-tight">Pick a vibe</h1>

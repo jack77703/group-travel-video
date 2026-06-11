@@ -125,7 +125,7 @@ export default function UploadPage() {
   const readyToUpload = photos.length === maxPhotos && !uploading
 
   return (
-    <main className="flex h-screen flex-col bg-black px-6 py-8 text-white">
+    <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
         {/* Header — fixed */}
         <div className="flex-shrink-0 space-y-2">
