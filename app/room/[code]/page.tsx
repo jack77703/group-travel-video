@@ -10,13 +10,19 @@ export default function JoinPage() {
   const params = useParams()
   const code = (params.code as string).toUpperCase()
   const [name, setName] = useState('')
+  const [roomName, setRoomName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (getSession(code)) {
       router.replace(`/room/${code}/lobby`)
+      return
     }
+    fetch(`/api/rooms/${code}`)
+      .then((r) => r.json())
+      .then((data) => { if (data.name) setRoomName(data.name) })
+      .catch(() => {})
   }, [code, router])
 
   async function handleJoin(e: FormEvent<HTMLFormElement>) {
@@ -57,9 +63,9 @@ export default function JoinPage() {
         <div className="space-y-6">
           <div className="space-y-4">
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl shadow-black/40">
-              <p className="text-xs text-white/35 uppercase tracking-[0.2em]">Room code</p>
-              <h1 className="mt-1 font-mono text-5xl font-black tracking-[0.18em] text-amber-100">
-                {code}
+              <p className="text-xs text-white/35 uppercase tracking-[0.2em]">You're invited to</p>
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-white">
+                {roomName ?? '…'}
               </h1>
             </div>
             <p className="text-sm text-white/45">
