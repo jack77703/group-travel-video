@@ -69,12 +69,31 @@ export default function LobbyPage() {
     }
   }, [code, loadRoom])
 
-  function copyInvite() {
+  async function handleShareInvite() {
     const url = `${window.location.origin}/room/${code}`
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: room?.name ?? 'Reveel Room',
+          text: 'Join my Reveel room and upload your secret photos!',
+          url,
+        })
+      } catch (err) {
+        // User dismissed the share sheet — not an error
+        if (err instanceof Error && err.name === 'AbortError') return
+        // Unexpected error — fall back to clipboard
+        navigator.clipboard.writeText(url).then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        })
+      }
+    } else {
+      // Desktop browsers without share support — copy to clipboard
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      })
+    }
   }
 
   async function handleGenerateAgain() {
@@ -116,7 +135,7 @@ export default function LobbyPage() {
   return (
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       {/* Top bar */}
-      <div className="flex flex-shrink-0 items-center justify-between">
+      <div className="flex-shrink-0">
         <button
           type="button"
           onClick={() => router.push('/')}
@@ -124,15 +143,6 @@ export default function LobbyPage() {
         >
           ← Home
         </button>
-        {isInitiator && (
-          <button
-            type="button"
-            onClick={copyInvite}
-            className="rounded-full border border-amber-200/30 bg-amber-200/10 px-3 py-1 text-xs font-semibold text-amber-200 transition hover:bg-amber-200/20"
-          >
-            {copied ? 'Copied!' : 'Share invite'}
-          </button>
-        )}
       </div>
 
       {/* Room info */}
@@ -225,6 +235,16 @@ export default function LobbyPage() {
               </button>
             )}
           </>
+        )}
+
+        {isInitiator && (
+          <button
+            type="button"
+            onClick={handleShareInvite}
+            className="w-full rounded-2xl border border-amber-200/40 bg-amber-200/10 px-5 py-3 text-base font-bold text-amber-200 transition hover:bg-amber-200/20 active:scale-[0.99]"
+          >
+            {copied ? 'Link copied!' : 'Invite friends ↗'}
+          </button>
         )}
       </div>
     </main>
