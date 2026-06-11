@@ -76,7 +76,7 @@ export default function CreatePage() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Room name — e.g. Bali Trip"
+              placeholder="Room name — e.g. New York Trip"
               required
               className="w-full rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-4 text-white outline-none transition placeholder:text-white/25 focus:border-amber-200/60 focus:ring-4 focus:ring-amber-200/10"
             />
