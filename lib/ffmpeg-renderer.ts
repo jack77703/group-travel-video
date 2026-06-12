@@ -2,22 +2,19 @@ import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 const OUTPUT_FPS = 30
-const ZOOM_MAGNITUDE = 0.08 // 8% extra area — subtle Ken Burns, less crop than 15%
+const ZOOM_MAGNITUDE = 0.08
 const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1166
 const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2074
 const DW = ZOOMED_W - 1080 // 86
 const DH = ZOOMED_H - 1920 // 154
-const HW = DW / 2 // 43 — half-delta for centred crop offset
-const HH = DH / 2 // 77
 
-// Decode image from buffer into an <img> to read natural dimensions.
 function getImageDimensions(buffer: Uint8Array): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     const blob = new Blob([buffer], { type: 'image/jpeg' })
     const url = URL.createObjectURL(blob)
     const img = new Image()
     img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight }) }
-    img.onerror = () => { URL.revokeObjectURL(url); resolve({ width: 1, height: 2 }) } // fallback portrait
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ width: 1, height: 2 }) }
     img.src = url
   })
 }
@@ -34,9 +31,8 @@ export async function renderReel(opts: {
 
   const ffmpeg = new FFmpeg()
   const frames = Math.round(photoDuration * OUTPUT_FPS)
-  const range = Math.max(frames - 1, 1) // denominator for n-based expressions; avoids ÷0
+  const range = Math.max(frames - 1, 1)
 
-  // Progress tracks across multiple exec calls (clips 0-90%, concat 90-100%)
   let clipsDone = 0
   let lastPct = 0
   ffmpeg.on('log', ({ message }) => {
@@ -46,23 +42,13 @@ export async function renderReel(opts: {
     if (match) {
       const f = Math.min(parseInt(match[1]), frames)
       const pct = Math.min(90, Math.round(((clipsDone * frames + f) / (photos.length * frames)) * 90))
-      if (pct > lastPct) {
-        lastPct = pct
-        onProgress(pct)
-      }
+      if (pct > lastPct) { lastPct = pct; onProgress(pct) }
     }
   })
 
-  // SharedArrayBuffer is required for the MT core. If the browser doesn't expose it
-  // (older iOS Safari, some Android WebViews) skip straight to ST — no point downloading
-  // the heavy MT WASM (~25 MB) only to fail.
   const sabAvailable = typeof SharedArrayBuffer !== 'undefined'
   console.info('[ffmpeg] SharedArrayBuffer available:', sabAvailable)
 
-  // Try multi-threaded core first; fall back to single-threaded if SAB/worker unavailable.
-  // The MT core can silently hang on some desktop browsers (workers spawn but never
-  // handshake back) — a plain try/catch won't catch a hung promise. We race against a
-  // 15-second timeout so a hang triggers the ST fallback just like a thrown error would.
   const mtLoaded = sabAvailable && await (async () => {
     try {
       const mtURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
@@ -76,9 +62,7 @@ export async function renderReel(opts: {
       )
       await Promise.race([ffmpeg.load({ coreURL, wasmURL, workerURL }), timeout])
       return true
-    } catch {
-      return false
-    }
+    } catch { return false }
   })()
 
   console.info('[ffmpeg] core:', mtLoaded ? 'multi-threaded' : 'single-threaded')
@@ -93,73 +77,98 @@ export async function renderReel(opts: {
 
   try {
     const photoBuffers = await Promise.all(photos.map(p => fetchFile(p.url)))
-
-    // Detect landscape orientation for each photo so Ken Burns pans the right axis.
     const isLandscape = await Promise.all(
       photoBuffers.map(async (buf) => {
         const { width, height } = await getImageDimensions(buf)
         return width > height
       })
     )
-
     for (let i = 0; i < photoBuffers.length; i++) {
       await ffmpeg.writeFile(`photo${i}.jpg`, photoBuffers[i])
     }
     await ffmpeg.writeFile('music.mp3', await fetchFile(musicUrl))
 
-    // Ken Burns via animated crop+scale.
+    // ─── Ken Burns filters ────────────────────────────────────────────────────
     //
-    // Portrait photos (width ≤ height):
-    //   prep — scale to 1.08× (ZOOMED_W×ZOOMED_H) then crop to exact size
-    //   animate — zoom-in (even): crop window shrinks + drifts diagonally toward the corner
-    //             zoom-out (odd): crop window grows from corner
-    //   The final scale=1080:1920 normalises output.
+    // Portrait  → zoom-in/out with corner variation
+    //   Corners cycle TL → TR → BL → BR as photos progress (i % 4).
+    //   Zoom direction alternates in/out (i % 2).
+    //   This gives cinematic variety without looking showy — the viewer just
+    //   feels the reel has energy, not that it loops the same move.
     //
-    // Landscape photos (width > height):
-    //   prep — same scale+crop; the heavy horizontal crop already happens here
-    //   animate — pan horizontally only (x moves, y stays at HH centre)
-    //   This matches how the eye reads wide photos — left/right reveals, not up/down zoom.
+    // Landscape → blurred background + sharp foreground + horizontal pan
+    //   The photo is shown at full width (1080px) on a blurred, darkened copy
+    //   of itself. This is the standard social-video treatment for wide photos.
+    //   A subtle horizontal pan (86px across the clip) adds motion.
+    //   Uses filter_complex (split stream → two processing paths → overlay).
+    //   Safe to use here because each exec call has only ONE looped input,
+    //   so the filter_complex concat deadlock cannot occur.
     //
-    // NOTE: these expressions work in a simple -vf pipeline but deadlock in filter_complex
-    // concat (looped streams never signal EOF to the concat filter).
-    // Solution: encode each photo as its own exec() call, then concat demuxer joins them.
-    const kenBurns = (i: number): string => {
+    // Returns { vf } for portrait (simple chain) or { fc } for landscape.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    type Filter = { vf: string; fc?: never } | { fc: string; vf?: never }
+
+    const portraitFilter = (i: number): string => {
       const prep = [
         `scale=${ZOOMED_W}:${ZOOMED_H}:force_original_aspect_ratio=increase`,
         `crop=${ZOOMED_W}:${ZOOMED_H}`,
         'setsar=1',
       ].join(',')
 
-      if (isLandscape[i]) {
-        // Horizontal pan: x slides across DW pixels, y is fixed at vertical centre (HH).
-        // Even → left-to-right; odd → right-to-left.
-        const x = i % 2 === 0
-          ? `${DW}*n/${range}`
-          : `${DW}-${DW}*n/${range}`
-        return `${prep},crop=w=1080:h=1920:x='${x}':y=${HH},scale=1080:1920,setsar=1`
-      }
+      // corner: 0=TL 1=TR 2=BL 3=BR
+      const corner = i % 4
+      const xLeft = corner === 0 || corner === 2  // TL / BL → left edge anchored
+      const yTop  = corner === 0 || corner === 1  // TL / TR → top edge anchored
 
-      // Portrait: zoom-in/out with diagonal drift
       if (i % 2 === 0) {
+        // zoom-in: crop shrinks toward the anchored corner
         const w = `${ZOOMED_W}-${DW}*n/${range}`
         const h = `${ZOOMED_H}-${DH}*n/${range}`
-        const x = `${HW}*n/${range}`
-        const y = `${HH}*n/${range}`
+        const x = xLeft ? '0' : `${DW}*n/${range}`
+        const y = yTop  ? '0' : `${DH}*n/${range}`
         return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
       } else {
+        // zoom-out: crop grows away from the anchored corner
         const w = `${1080}+${DW}*n/${range}`
         const h = `${1920}+${DH}*n/${range}`
-        const x = `${HW}-${HW}*n/${range}`
-        const y = `${HH}-${HH}*n/${range}`
+        const x = xLeft ? '0' : `${DW}-${DW}*n/${range}`
+        const y = yTop  ? '0' : `${DH}-${DH}*n/${range}`
         return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
       }
     }
 
+    const landscapeFilter = (i: number): string => {
+      // pan direction alternates per photo
+      const panX = i % 2 === 0
+        ? `${DW}*n/${range}`
+        : `${DW}-${DW}*n/${range}`
+      // Background: fill 1080×1920, blur heavily, darken 25%
+      // Foreground: scale to ZOOMED_W wide, crop 1080px wide with pan, overlay centred
+      return (
+        `[0:v]split=2[fg][bg];` +
+        `[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,` +
+        `gblur=sigma=25,eq=brightness=-0.25[bgblur];` +
+        `[fg]scale=${ZOOMED_W}:-2[fgbig];` +
+        `[fgbig]crop=1080:ih:${panX}:0[fgpan];` +
+        `[bgblur][fgpan]overlay=0:(H-h)/2,setsar=1`
+      )
+    }
+
+    const kenBurns = (i: number): Filter =>
+      isLandscape[i]
+        ? { fc: landscapeFilter(i) }
+        : { vf: portraitFilter(i) }
+
+    // ─── Encoding ─────────────────────────────────────────────────────────────
+
     if (photos.length === 1) {
+      const { vf, fc } = kenBurns(0)
+      const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
       const code = await ffmpeg.exec([
         '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'photo0.jpg',
         '-i', 'music.mp3',
-        '-vf', kenBurns(0),
+        ...filterArgs,
         '-r', String(OUTPUT_FPS),
         '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
         '-c:a', 'aac', '-b:a', '128k',
@@ -168,11 +177,12 @@ export async function renderReel(opts: {
       ])
       if (code !== 0) throw new Error(`FFmpeg exited with code ${code}`)
     } else {
-      // Encode each photo as an individual clip (simple -vf, no filter_complex).
       for (let i = 0; i < photos.length; i++) {
+        const { vf, fc } = kenBurns(i)
+        const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
         const code = await ffmpeg.exec([
           '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', `photo${i}.jpg`,
-          '-vf', kenBurns(i),
+          ...filterArgs,
           '-r', String(OUTPUT_FPS),
           '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
           `clip${i}.mp4`,
@@ -183,11 +193,9 @@ export async function renderReel(opts: {
         onProgress?.(lastPct)
       }
 
-      // Join clips + audio with the concat demuxer (no re-encoding of video).
       const concatTxt = 'ffconcat version 1.0\n'
         + photos.map((_, i) => `file 'clip${i}.mp4'\nduration ${photoDuration}`).join('\n')
       await ffmpeg.writeFile('clips.txt', concatTxt)
-
       onProgress?.(92)
 
       const code = await ffmpeg.exec([
