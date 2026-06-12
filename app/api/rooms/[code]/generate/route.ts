@@ -76,7 +76,7 @@ export async function POST(
   for (const photo of photos) {
     const { data } = await supabase.storage
       .from('photos')
-      .createSignedUrl(photo.storage_path, 3600)
+      .createSignedUrl(photo.storage_path, 86400)
     if (data?.signedUrl) {
       photoItems.push({ url: data.signedUrl })
     }
@@ -87,6 +87,7 @@ export async function POST(
 
   const creatomate = new CreatomateClient(process.env.CREATOMATE_API_KEY!)
   const renders = await creatomate.startRender({
+    renderScale: 1,
     source: {
       output_format: 'mp4',
       width: 1080,
@@ -106,6 +107,10 @@ export async function POST(
           source: url,
           time: i * photo_duration,
           duration: photo_duration,
+          width: '100%',
+          height: '100%',
+          x: '50%',
+          y: '50%',
           fit: 'cover',
           ...(animations.length > 0 ? { animations } : {}),
         })),
