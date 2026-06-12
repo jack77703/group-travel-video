@@ -101,6 +101,7 @@ export async function POST(
       width: 1080,
       height: 1920,
       frame_rate: 30,
+      crf: 18,
       fill_color: '#000000',
       elements: [
         {
