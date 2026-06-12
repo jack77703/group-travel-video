@@ -133,6 +133,8 @@ export default function LobbyPage() {
 
   const maxMembers = Math.min(20, Math.floor(60 / room.max_photos_per_member))
   const allZero = room.members.every((m: MemberPublic) => m.photos_uploaded === 0)
+  const myMember = room.members.find((m: MemberPublic) => m.id === myMemberId)
+  const myHasUploaded = myMember ? myMember.photos_uploaded > 0 : true
 
   return (
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
@@ -201,7 +203,17 @@ export default function LobbyPage() {
           </button>
         )}
 
-        {room.status === 'open' && isInitiator && (
+        {room.status === 'open' && !myHasUploaded && (
+          <button
+            type="button"
+            onClick={() => router.push(`/room/${code}/upload`)}
+            className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
+          >
+            Upload your photos
+          </button>
+        )}
+
+        {room.status === 'open' && isInitiator && myHasUploaded && (
           <button
             type="button"
             onClick={() => router.push(`/room/${code}/generate`)}
@@ -212,23 +224,11 @@ export default function LobbyPage() {
           </button>
         )}
 
-        {room.status === 'open' && !isInitiator && (() => {
-          const myMember = room.members.find((m: MemberPublic) => m.id === myMemberId)
-          const hasUploaded = myMember ? myMember.photos_uploaded > 0 : true
-          return hasUploaded ? (
-            <p className="py-3 text-center text-sm text-white/40">
-              Waiting for the host to generate the reel...
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={() => router.push(`/room/${code}/upload`)}
-              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
-            >
-              Upload your photos
-            </button>
-          )
-        })()}
+        {room.status === 'open' && !isInitiator && myHasUploaded && (
+          <p className="py-3 text-center text-sm text-white/40">
+            Waiting for the host to generate the reel...
+          </p>
+        )}
 
         {room.status === 'generating' && (
           isInitiator ? (
