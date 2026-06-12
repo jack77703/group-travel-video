@@ -1,5 +1,5 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { fetchFile } from '@ffmpeg/util'
 
 const OUTPUT_FPS = 30
 const ZOOM_MAGNITUDE = 0.08
@@ -47,25 +47,13 @@ export async function renderReel(opts: {
     }
   })
 
-  // Wrap any promise with a hard deadline so a hanging CDN fetch never blocks.
-  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
-    Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
-
-  // MT core is disabled: Chrome's COEP/blob-worker combination means MT
-  // never reliably initialises in this app's security context, so attempting
-  // it wastes up to 40 seconds (25s download + 15s load) before falling back.
-  // ST handles all encoding and produces identical output.
-  console.info('[ffmpeg] core: single-threaded')
-
-  const stURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd'
-  const [coreURL, wasmURL] = await withTimeout(
-    Promise.all([
-      toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript'),
-      toBlobURL(`${stURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    ]),
-    30000,
-  )
-  await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 15000)
+  // WASM core loaded from same-origin /public/ffmpeg/ — no CDN dependency,
+  // no browser-extension interference, browser-cached after first load.
+  console.info('[ffmpeg] core: single-threaded, local bundle')
+  await ffmpeg.load({
+    coreURL: '/ffmpeg/ffmpeg-core.js',
+    wasmURL: '/ffmpeg/ffmpeg-core.wasm',
+  })
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
   // to "Encoding". Without this, the progress bar sits at 0% during WASM load

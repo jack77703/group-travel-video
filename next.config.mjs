@@ -9,6 +9,12 @@ const nextConfig = {
           { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
         ],
       },
+      {
+        source: '/ffmpeg/:file*.wasm',
+        headers: [
+          { key: 'Content-Type', value: 'application/wasm' },
+        ],
+      },
     ]
   },
 }
