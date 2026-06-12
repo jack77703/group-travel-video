@@ -5,6 +5,32 @@ import { useEffect, useRef, useState } from 'react'
 
 import { getSession, Session } from '@/lib/session'
 
+async function toJpeg(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      const MAX = 3840
+      let { naturalWidth: w, naturalHeight: h } = img
+      if (w > MAX || h > MAX) {
+        if (w >= h) { h = Math.round(h * MAX / w); w = MAX }
+        else { w = Math.round(w * MAX / h); h = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      canvas.toBlob(
+        (blob) => resolve(new File([blob!], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })),
+        'image/jpeg',
+        0.92
+      )
+    }
+    img.src = objectUrl
+  })
+}
+
 export default function UploadPage() {
   const router = useRouter()
   const params = useParams()
@@ -47,12 +73,15 @@ export default function UploadPage() {
       .catch(() => setError('Could not load room details'))
   }, [code, router])
 
-  function handleAddFiles(files: FileList | null) {
+  async function handleAddFiles(files: FileList | null) {
     if (!files) return
     const slotsLeft = maxPhotos - photos.length
-    const incoming = Array.from(files)
-      .filter((f) => f.type.startsWith('image/'))
-      .slice(0, slotsLeft)
+    const incoming = await Promise.all(
+      Array.from(files)
+        .filter((f) => f.type.startsWith('image/'))
+        .slice(0, slotsLeft)
+        .map(toJpeg)
+    )
     setPhotos((prev) => [...prev, ...incoming])
   }
 
@@ -65,14 +94,15 @@ export default function UploadPage() {
     replaceInputRef.current?.click()
   }
 
-  function handleReplaceFile(files: FileList | null) {
+  async function handleReplaceFile(files: FileList | null) {
     if (!files || files.length === 0) return
     const file = files[0]
     if (!file.type.startsWith('image/')) return
+    const compressed = await toJpeg(file)
     const idx = replaceIndexRef.current
     setPhotos((prev) => {
       const next = [...prev]
-      next[idx] = file
+      next[idx] = compressed
       return next
     })
     if (replaceInputRef.current) replaceInputRef.current.value = ''

@@ -100,6 +100,7 @@ export async function POST(
       output_format: 'mp4',
       width: 1080,
       height: 1920,
+      frame_rate: 30,
       fill_color: '#000000',
       elements: [
         {
