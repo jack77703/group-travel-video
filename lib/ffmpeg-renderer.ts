@@ -13,6 +13,12 @@ export async function renderReel(opts: {
 
   if (photos.length === 0) throw new Error('No photos provided')
 
+  if (photoDuration <= TRANSITION_DURATION) {
+    throw new Error(
+      `photoDuration (${photoDuration}s) must be greater than transition duration (${TRANSITION_DURATION}s)`
+    )
+  }
+
   const ffmpeg = new FFmpeg()
 
   // Total output duration is shorter than a hard-cut slideshow because transitions overlap
@@ -48,7 +54,7 @@ export async function renderReel(opts: {
 
     // One looping still-image input per photo, each capped at photoDuration
     for (let i = 0; i < photos.length; i++) {
-      args.push('-loop', '1', '-t', String(photoDuration), '-i', `photo${i}.jpg`)
+      args.push('-framerate', '30', '-loop', '1', '-t', String(photoDuration), '-i', `photo${i}.jpg`)
     }
     // Music is the last input (index = photos.length)
     args.push('-i', 'music.mp3')
@@ -63,7 +69,7 @@ export async function renderReel(opts: {
         '-vf', scaleFilter,
         '-r', '30',
         '-map', '0:v',
-        '-map', '1:a',
+        '-map', `${photos.length}:a`,
       )
     } else {
       // Build filter_complex: scale each input, then chain xfade dissolves
