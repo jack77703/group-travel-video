@@ -191,10 +191,13 @@ export default function GeneratePage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setStatus('idle')
-      // Reset room status so the user can try again without getting stuck
+      // Reset room status so the user can try again without getting stuck.
+      // keepalive ensures the request survives page unload — without it the
+      // browser cancels the fetch when the user navigates away before it finishes.
       fetch(`/api/rooms/${code}/reset`, {
         method: 'POST',
         headers: { 'x-initiator-token': initiatorToken },
+        keepalive: true,
       }).catch(() => {})
     }
   }
