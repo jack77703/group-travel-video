@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@supabase/supabase-js": "^2.107.0",
     "creatomate": "^1.2.1",
     "next": "14.2.35",
