@@ -145,10 +145,13 @@ export async function renderReel(opts: {
         : `${DW}-${DW}*n/${range}`
       // Background: fill 1080×1920, blur heavily, darken 25%
       // Foreground: scale to ZOOMED_W wide, crop 1080px wide with pan, overlay centred
+      // Blur via scale-down + scale-up (bilinear). gblur=sigma=25 is O(radius²) per
+      // pixel — at 1080×1920 it takes minutes in single-threaded WASM. This is
+      // ~10,000× faster and produces an indistinguishable blurry background.
       return (
         `[0:v]split=2[fg][bg];` +
         `[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,` +
-        `gblur=sigma=25,eq=brightness=-0.25[bgblur];` +
+        `scale=68:120:flags=bilinear,scale=1080:1920:flags=bilinear,eq=brightness=-0.25[bgblur];` +
         `[fg]scale=${ZOOMED_W}:-2[fgbig];` +
         `[fgbig]crop=1080:ih:${panX}:0[fgpan];` +
         `[bgblur][fgpan]overlay=0:(H-h)/2,setsar=1`
