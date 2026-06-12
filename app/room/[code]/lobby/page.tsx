@@ -217,22 +217,29 @@ export default function LobbyPage() {
         )}
 
         {room.status === 'generating' && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-3 py-3">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-              <p className="text-sm text-white/60">Generating your reel...</p>
-            </div>
-            {isInitiator && (
+          isInitiator ? (
+            <div className="space-y-3">
+              <div className="rounded-[2rem] border border-amber-400/20 bg-amber-500/10 px-5 py-6 text-center">
+                <p className="font-bold text-amber-200">Encoding was interrupted</p>
+                <p className="mt-1 text-sm text-amber-100/60">
+                  The video didn't finish encoding. Tap below to try again.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleGenerateAgain}
                 disabled={resetting}
-                className="w-full py-2 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
+                className="w-full rounded-2xl bg-white px-5 py-4 text-base font-bold text-black transition hover:bg-amber-100 disabled:opacity-40"
               >
-                {resetting ? 'Resetting...' : 'Stuck? Try again'}
+                {resetting ? 'Resetting...' : 'Try Again'}
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-3 py-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              <p className="text-sm text-white/60">Generating your reel...</p>
+            </div>
+          )
         )}
 
         {room.status === 'done' && (
