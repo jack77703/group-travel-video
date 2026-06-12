@@ -60,6 +60,7 @@ export default function GeneratePage() {
   const [pace, setPace] = useState(2)
   const [status, setStatus] = useState<Status>('idle')
   const [pct, setPct] = useState(0)
+  const [dlPct, setDlPct] = useState(0)
   const [error, setError] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const pendingTrackIdRef = useRef<string | null>(null)
@@ -131,6 +132,7 @@ export default function GeneratePage() {
     setStatus('idle')
     setError('')
     setPct(0)
+    setDlPct(0)
 
     try {
       const genRes = await fetch(`/api/rooms/${code}/generate`, {
@@ -162,6 +164,7 @@ export default function GeneratePage() {
         photoDuration: pace,
         onProgress: setPct,
         onEncoderReady: () => setStatus('encoding'),
+        onDownloadProgress: setDlPct,
       })
 
       const uploadUrlRes = await fetch(`/api/rooms/${code}/reel/upload-url`, {
@@ -216,7 +219,11 @@ export default function GeneratePage() {
   const busy = status !== 'idle'
 
   function statusLabel() {
-    if (status === 'loading-encoder') return 'Loading encoder…'
+    if (status === 'loading-encoder') {
+      if (dlPct >= 100) return 'Initializing encoder…'
+      if (dlPct > 0)    return `Downloading encoder… ${dlPct}%`
+      return 'Loading encoder…'
+    }
     if (status === 'encoding') return `Encoding… ${pct}%`
     if (status === 'uploading') return 'Uploading…'
     return 'Generate Reel'
@@ -324,6 +331,21 @@ export default function GeneratePage() {
             <span>Slow</span>
           </div>
         </div>
+
+        {status === 'loading-encoder' && dlPct > 0 && dlPct < 100 && (
+          <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-white/50">
+              <span>Downloading encoder</span>
+              <span>{dlPct}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-white/10">
+              <div
+                className="h-1.5 rounded-full bg-amber-200/50 transition-all"
+                style={{ width: `${dlPct}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {status === 'encoding' && (
           <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3">

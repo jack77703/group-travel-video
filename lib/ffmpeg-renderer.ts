@@ -1,5 +1,35 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { fetchFile } from '@ffmpeg/util'
+
+// Streams a URL into a blob: URL, reporting byte-level download progress.
+// Replaces toBlobURL() which blindly buffers the entire file before returning
+// — that works fine for small files but blocks with no feedback for 31 MB WASM.
+// Falls back to arrayBuffer() when Content-Length is absent (no progress shown).
+async function streamToBlobURL(
+  url: string,
+  mimeType: string,
+  onProgress?: (pct: number) => void,
+): Promise<string> {
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`Failed to fetch ${url} (${resp.status})`)
+  const total = parseInt(resp.headers.get('content-length') ?? '0', 10)
+  if (!onProgress || !total || !resp.body) {
+    const buf = await resp.arrayBuffer()
+    return URL.createObjectURL(new Blob([buf], { type: mimeType }))
+  }
+  const reader = resp.body.getReader()
+  const chunks: Uint8Array[] = []
+  let received = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.byteLength
+    onProgress(Math.min(99, Math.round((received / total) * 100)))
+  }
+  onProgress(100)
+  return URL.createObjectURL(new Blob(chunks, { type: mimeType }))
+}
 
 const OUTPUT_FPS = 30
 const ZOOM_MAGNITUDE = 0.08
@@ -25,8 +55,9 @@ export async function renderReel(opts: {
   photoDuration: number
   onProgress?: (pct: number) => void
   onEncoderReady?: () => void
+  onDownloadProgress?: (pct: number) => void
 }): Promise<Blob> {
-  const { photos, musicUrl, photoDuration, onProgress, onEncoderReady } = opts
+  const { photos, musicUrl, photoDuration, onProgress, onEncoderReady, onDownloadProgress } = opts
 
   if (photos.length === 0) throw new Error('No photos provided')
 
@@ -47,23 +78,23 @@ export async function renderReel(opts: {
     }
   })
 
-  // toBlobURL fetches each file in the main-thread context (same-origin, so no
-  // CDN / browser-extension issues) and returns a blob: URL. The Worker inside
-  // @ffmpeg/ffmpeg receives blob: URLs and reads content directly from memory —
-  // no network request from the Worker at all. Passing plain URL paths instead
-  // of blob: URLs causes the Worker's dynamic import() to hang indefinitely.
+  // streamToBlobURL fetches files in the main thread (same-origin, so no CDN
+  // or browser-extension interference) and gives the @ffmpeg/ffmpeg Worker a
+  // blob: URL it can read from memory without making its own network request.
+  //
+  // The WASM file is 31 MB. On a slow connection this takes 30–120s. We show
+  // byte-level progress so the user sees "Downloading encoder… 45%" rather
+  // than a frozen spinner. There is intentionally no download timeout — the
+  // progress bar is the signal, and the browser surfaces network errors itself.
   const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
     Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
 
-  console.info('[ffmpeg] loading local WASM bundle...')
-  const [coreURL, wasmURL] = await withTimeout(
-    Promise.all([
-      toBlobURL('/ffmpeg/ffmpeg-core.js',   'text/javascript'),
-      toBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm'),
-    ]),
-    60000,  // 60s: generous for first-visit 31 MB download on slow connections
-  )
-  console.info('[ffmpeg] WASM downloaded, initialising core...')
+  console.info('[ffmpeg] downloading local WASM bundle...')
+  const [coreURL, wasmURL] = await Promise.all([
+    streamToBlobURL('/ffmpeg/ffmpeg-core.js',   'text/javascript'),
+    streamToBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm', onDownloadProgress),
+  ])
+  console.info('[ffmpeg] WASM ready, initialising core...')
   await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 15000)
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
