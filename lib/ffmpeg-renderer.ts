@@ -1,5 +1,5 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile } from '@ffmpeg/util'
+import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 const OUTPUT_FPS = 30
 const ZOOM_MAGNITUDE = 0.08
@@ -47,13 +47,24 @@ export async function renderReel(opts: {
     }
   })
 
-  // WASM core loaded from same-origin /public/ffmpeg/ — no CDN dependency,
-  // no browser-extension interference, browser-cached after first load.
-  console.info('[ffmpeg] core: single-threaded, local bundle')
-  await ffmpeg.load({
-    coreURL: '/ffmpeg/ffmpeg-core.js',
-    wasmURL: '/ffmpeg/ffmpeg-core.wasm',
-  })
+  // toBlobURL fetches each file in the main-thread context (same-origin, so no
+  // CDN / browser-extension issues) and returns a blob: URL. The Worker inside
+  // @ffmpeg/ffmpeg receives blob: URLs and reads content directly from memory —
+  // no network request from the Worker at all. Passing plain URL paths instead
+  // of blob: URLs causes the Worker's dynamic import() to hang indefinitely.
+  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
+
+  console.info('[ffmpeg] loading local WASM bundle...')
+  const [coreURL, wasmURL] = await withTimeout(
+    Promise.all([
+      toBlobURL('/ffmpeg/ffmpeg-core.js',   'text/javascript'),
+      toBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm'),
+    ]),
+    60000,  // 60s: generous for first-visit 31 MB download on slow connections
+  )
+  console.info('[ffmpeg] WASM downloaded, initialising core...')
+  await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 15000)
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
   // to "Encoding". Without this, the progress bar sits at 0% during WASM load
