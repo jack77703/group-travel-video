@@ -27,13 +27,22 @@ export async function renderReel(opts: {
     }
   })
 
-  // Multi-threaded core — requires SharedArrayBuffer (COOP/COEP headers in next.config.mjs)
-  const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
-  await ffmpeg.load({
-    coreURL:   await toBlobURL(`${baseURL}/ffmpeg-core.js`,        'text/javascript'),
-    wasmURL:   await toBlobURL(`${baseURL}/ffmpeg-core.wasm`,      'application/wasm'),
-    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-  })
+  // Try multi-threaded core first (2-4x faster, needs SharedArrayBuffer + COOP/COEP headers).
+  // Fall back to single-threaded if MT fails for any reason (missing SAB, network 404, etc.).
+  try {
+    const mtURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
+    await ffmpeg.load({
+      coreURL:   await toBlobURL(`${mtURL}/ffmpeg-core.js`,        'text/javascript'),
+      wasmURL:   await toBlobURL(`${mtURL}/ffmpeg-core.wasm`,      'application/wasm'),
+      workerURL: await toBlobURL(`${mtURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+    })
+  } catch {
+    const stURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript'),
+      wasmURL: await toBlobURL(`${stURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    })
+  }
 
   try {
     const photoBuffers = await Promise.all(photos.map((p) => fetchFile(p.url)))
@@ -99,6 +108,9 @@ export async function renderReel(opts: {
 
     const data = await ffmpeg.readFile('output.mp4')
     return new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' })
+  } catch (err) {
+    // Ensure callers always receive an Error so the UI shows a real message
+    throw err instanceof Error ? err : new Error(String(err))
   } finally {
     ffmpeg.terminate()
   }
