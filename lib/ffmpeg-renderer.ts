@@ -28,7 +28,7 @@ async function streamToBlobURL(
     onProgress(Math.min(99, Math.round((received / total) * 100)))
   }
   onProgress(100)
-  return URL.createObjectURL(new Blob(chunks, { type: mimeType }))
+  return URL.createObjectURL(new Blob(chunks.map(c => Uint8Array.from(c)), { type: mimeType }))
 }
 
 const OUTPUT_FPS = 30
