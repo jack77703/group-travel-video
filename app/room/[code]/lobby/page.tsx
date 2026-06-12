@@ -217,9 +217,21 @@ export default function LobbyPage() {
         )}
 
         {room.status === 'generating' && (
-          <div className="flex items-center justify-center gap-3 py-3">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-            <p className="text-sm text-white/60">Generating your reel...</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-3 py-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              <p className="text-sm text-white/60">Generating your reel...</p>
+            </div>
+            {isInitiator && (
+              <button
+                type="button"
+                onClick={handleGenerateAgain}
+                disabled={resetting}
+                className="w-full py-2 text-sm text-white/30 transition hover:text-white/60 disabled:opacity-40"
+              >
+                {resetting ? 'Resetting...' : 'Stuck? Try again'}
+              </button>
+            )}
           </div>
         )}
 
