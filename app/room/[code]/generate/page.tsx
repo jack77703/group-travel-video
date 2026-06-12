@@ -171,12 +171,20 @@ export default function GeneratePage() {
       if (!uploadUrlRes.ok) throw new Error('Failed to get upload URL')
 
       setStatus('uploading')
-      const putRes = await fetch(uploadUrlData.signedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'video/mp4' },
-        body: blob,
-      })
-      if (!putRes.ok) throw new Error('Upload failed')
+      let putRes: Response
+      try {
+        putRes = await fetch(uploadUrlData.signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'video/mp4' },
+          body: blob,
+        })
+      } catch (netErr) {
+        throw new Error(`Upload network error: ${netErr instanceof Error ? netErr.message : String(netErr)}`)
+      }
+      if (!putRes.ok) {
+        const body = await putRes.text().catch(() => '')
+        throw new Error(`Upload failed (${putRes.status})${body ? ': ' + body.slice(0, 300) : ''}`)
+      }
 
       await fetch(`/api/rooms/${code}/reel/complete`, {
         method: 'POST',

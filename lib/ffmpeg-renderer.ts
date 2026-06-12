@@ -98,7 +98,7 @@ export async function renderReel(opts: {
     }
 
     args.push(
-      '-c:v', 'libx264', '-crf', '18', '-preset', 'ultrafast',
+      '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
       '-c:a', 'aac', '-b:a', '128k',
       '-shortest', '-movflags', '+faststart',
       'output.mp4',
