@@ -5,7 +5,6 @@ import { createServerClient } from '@/lib/supabase-server'
 
 type PhotoRow = {
   storage_path: string
-  members: { name: string } | { name: string }[] | null
 }
 
 function buildAnimations(type: string) {
@@ -25,11 +24,6 @@ function shuffle<T>(arr: T[]): T[] {
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
-}
-
-function getMemberName(members: PhotoRow['members']): string {
-  if (Array.isArray(members)) return members[0]?.name ?? ''
-  return members?.name ?? ''
 }
 
 export async function POST(
@@ -69,7 +63,7 @@ export async function POST(
 
   const { data: rawPhotos } = await supabase
     .from('photos')
-    .select('storage_path, members(name)')
+    .select('storage_path')
     .eq('room_id', room.id)
 
   if (!rawPhotos || rawPhotos.length === 0) {
@@ -78,16 +72,13 @@ export async function POST(
 
   const photos = shuffle(rawPhotos as PhotoRow[])
 
-  const photoItems: Array<{ url: string; memberName: string }> = []
+  const photoItems: Array<{ url: string }> = []
   for (const photo of photos) {
     const { data } = await supabase.storage
       .from('photos')
       .createSignedUrl(photo.storage_path, 3600)
     if (data?.signedUrl) {
-      photoItems.push({
-        url: data.signedUrl,
-        memberName: getMemberName(photo.members),
-      })
+      photoItems.push({ url: data.signedUrl })
     }
   }
 
@@ -110,36 +101,14 @@ export async function POST(
           duration: totalDuration,
           audio_fade_out: 2,
         },
-        ...photoItems.flatMap(({ url, memberName }, i) => {
-          const imageEl: Record<string, unknown> = {
-            type: 'image',
-            source: url,
-            time: i * photo_duration,
-            duration: photo_duration,
-            fit: 'cover',
-            ...(animations.length > 0 ? { animations } : {}),
-          }
-          const els: Record<string, unknown>[] = [imageEl]
-          if (memberName) {
-            els.push({
-              type: 'text',
-              text: memberName,
-              time: i * photo_duration,
-              duration: photo_duration,
-              // bottom-left: element center at 28% x, 93% y; 56% wide covers left half
-              x: '28%',
-              y: '93%',
-              width: '56%',
-              x_alignment: '0%',
-              font_size: 44,
-              font_weight: '700',
-              color: '#ffffff',
-              shadow_color: 'rgba(0,0,0,0.75)',
-              shadow_blur: 4,
-            })
-          }
-          return els
-        }),
+        ...photoItems.map(({ url }, i) => ({
+          type: 'image',
+          source: url,
+          time: i * photo_duration,
+          duration: photo_duration,
+          fit: 'cover',
+          ...(animations.length > 0 ? { animations } : {}),
+        })),
       ],
     },
     webhookUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/creatomate`,
