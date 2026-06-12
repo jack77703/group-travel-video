@@ -1,6 +1,8 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
+const TRANSITION_DURATION = 0.5 // seconds, crossfade overlap between photos
+
 export async function renderReel(opts: {
   photos: { url: string }[]
   musicUrl: string
@@ -13,11 +15,15 @@ export async function renderReel(opts: {
 
   const ffmpeg = new FFmpeg()
 
+  // Total output duration is shorter than a hard-cut slideshow because transitions overlap
+  const totalDuration =
+    photos.length * photoDuration - (photos.length - 1) * TRANSITION_DURATION
+  const totalFrames = Math.round(totalDuration * 30)
+
   ffmpeg.on('log', ({ message }) => {
     if (!onProgress) return
     const match = message.match(/frame=\s*(\d+)/)
     if (match) {
-      const totalFrames = photos.length * photoDuration * 30
       const pct = Math.min(99, Math.round((parseInt(match[1]) / totalFrames) * 100))
       onProgress(pct)
     }
@@ -36,27 +42,63 @@ export async function renderReel(opts: {
     for (let i = 0; i < photoBuffers.length; i++) {
       await ffmpeg.writeFile(`photo${i}.jpg`, photoBuffers[i])
     }
-
     await ffmpeg.writeFile('music.mp3', await fetchFile(musicUrl))
 
-    // ffconcat requires a trailing file entry (no duration) to flush the last frame
-    const lines = photos.map((_, i) => `file 'photo${i}.jpg'\nduration ${photoDuration}`).join('\n')
-    await ffmpeg.writeFile(
-      'concat.txt',
-      `ffconcat version 1.0\n${lines}\nfile 'photo${photos.length - 1}.jpg'\n`
-    )
+    const args: string[] = []
 
-    const exitCode = await ffmpeg.exec([
-      '-f', 'concat', '-safe', '0', '-i', 'concat.txt',
-      '-r', '30',
-      '-i', 'music.mp3',
-      '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black',
+    // One looping still-image input per photo, each capped at photoDuration
+    for (let i = 0; i < photos.length; i++) {
+      args.push('-loop', '1', '-t', String(photoDuration), '-i', `photo${i}.jpg`)
+    }
+    // Music is the last input (index = photos.length)
+    args.push('-i', 'music.mp3')
+
+    const scaleFilter =
+      'scale=1080:1920:force_original_aspect_ratio=decrease,' +
+      'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1'
+
+    if (photos.length === 1) {
+      // Single photo: no xfade needed, use simple -vf
+      args.push(
+        '-vf', scaleFilter,
+        '-r', '30',
+        '-map', '0:v',
+        '-map', '1:a',
+      )
+    } else {
+      // Build filter_complex: scale each input, then chain xfade dissolves
+      const filterParts: string[] = []
+
+      for (let i = 0; i < photos.length; i++) {
+        filterParts.push(`[${i}:v]${scaleFilter}[v${i}]`)
+      }
+
+      let lastLabel = 'v0'
+      for (let i = 1; i < photos.length; i++) {
+        const offset = i * (photoDuration - TRANSITION_DURATION)
+        const outLabel = i === photos.length - 1 ? 'vout' : `x${i}`
+        filterParts.push(
+          `[${lastLabel}][v${i}]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${offset}[${outLabel}]`
+        )
+        lastLabel = outLabel
+      }
+
+      args.push(
+        '-filter_complex', filterParts.join(';'),
+        '-map', '[vout]',
+        '-map', `${photos.length}:a`,
+        '-r', '30',
+      )
+    }
+
+    args.push(
       '-c:v', 'libx264', '-crf', '18', '-preset', 'ultrafast',
       '-c:a', 'aac', '-b:a', '128k',
       '-shortest', '-movflags', '+faststart',
       'output.mp4',
-    ])
+    )
 
+    const exitCode = await ffmpeg.exec(args)
     if (exitCode !== 0) throw new Error(`FFmpeg exited with code ${exitCode}`)
 
     onProgress?.(100)
