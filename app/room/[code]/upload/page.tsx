@@ -158,6 +158,15 @@ export default function UploadPage() {
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
         {/* Header — fixed */}
+        <div className="flex-shrink-0 mb-2">
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+          >
+            ← Home
+          </button>
+        </div>
         <div className="flex-shrink-0 flex items-center justify-between">
           <h1 className="text-2xl font-black tracking-tight">Your shots</h1>
           <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold text-white/60">

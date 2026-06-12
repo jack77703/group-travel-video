@@ -123,6 +123,15 @@ export default function SharePage() {
   return (
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
+        <div className="flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+          >
+            ← Home
+          </button>
+        </div>
         <div className="min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-3 shadow-2xl shadow-black/40">
           <video
             ref={videoRef}

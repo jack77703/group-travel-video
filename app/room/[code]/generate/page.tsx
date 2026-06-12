@@ -223,6 +223,15 @@ export default function GeneratePage() {
     <main className="h-dvh overflow-hidden bg-black px-6 py-8 text-white">
       <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
         <div className="flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+          >
+            ← Home
+          </button>
+        </div>
+        <div className="flex-shrink-0">
           <h1 className="text-3xl font-black tracking-tight">Pick a vibe</h1>
         </div>
 

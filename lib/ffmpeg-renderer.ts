@@ -2,13 +2,25 @@ import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 const OUTPUT_FPS = 30
-const ZOOM_MAGNITUDE = 0.15 // photos zoom between 1× and 1.15× (Ken Burns)
-const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1242
-const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2208
-const DW = ZOOMED_W - 1080 // 162
-const DH = ZOOMED_H - 1920 // 288
-const HW = DW / 2 // 81 — half-delta for centred crop offset
-const HH = DH / 2 // 144
+const ZOOM_MAGNITUDE = 0.08 // 8% extra area — subtle Ken Burns, less crop than 15%
+const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1166
+const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2074
+const DW = ZOOMED_W - 1080 // 86
+const DH = ZOOMED_H - 1920 // 154
+const HW = DW / 2 // 43 — half-delta for centred crop offset
+const HH = DH / 2 // 77
+
+// Decode image from buffer into an <img> to read natural dimensions.
+function getImageDimensions(buffer: Uint8Array): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const blob = new Blob([buffer], { type: 'image/jpeg' })
+    const url = URL.createObjectURL(blob)
+    const img = new Image()
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight }) }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ width: 1, height: 2 }) } // fallback portrait
+    img.src = url
+  })
+}
 
 export async function renderReel(opts: {
   photos: { url: string }[]
@@ -41,15 +53,37 @@ export async function renderReel(opts: {
     }
   })
 
+  // SharedArrayBuffer is required for the MT core. If the browser doesn't expose it
+  // (older iOS Safari, some Android WebViews) skip straight to ST — no point downloading
+  // the heavy MT WASM (~25 MB) only to fail.
+  const sabAvailable = typeof SharedArrayBuffer !== 'undefined'
+  console.info('[ffmpeg] SharedArrayBuffer available:', sabAvailable)
+
   // Try multi-threaded core first; fall back to single-threaded if SAB/worker unavailable.
-  try {
-    const mtURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
-    await ffmpeg.load({
-      coreURL:   await toBlobURL(`${mtURL}/ffmpeg-core.js`,        'text/javascript'),
-      wasmURL:   await toBlobURL(`${mtURL}/ffmpeg-core.wasm`,      'application/wasm'),
-      workerURL: await toBlobURL(`${mtURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-    })
-  } catch {
+  // The MT core can silently hang on some desktop browsers (workers spawn but never
+  // handshake back) — a plain try/catch won't catch a hung promise. We race against a
+  // 15-second timeout so a hang triggers the ST fallback just like a thrown error would.
+  const mtLoaded = sabAvailable && await (async () => {
+    try {
+      const mtURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
+      const [coreURL, wasmURL, workerURL] = await Promise.all([
+        toBlobURL(`${mtURL}/ffmpeg-core.js`,        'text/javascript'),
+        toBlobURL(`${mtURL}/ffmpeg-core.wasm`,      'application/wasm'),
+        toBlobURL(`${mtURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+      ])
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('MT load timeout')), 15000)
+      )
+      await Promise.race([ffmpeg.load({ coreURL, wasmURL, workerURL }), timeout])
+      return true
+    } catch {
+      return false
+    }
+  })()
+
+  console.info('[ffmpeg] core:', mtLoaded ? 'multi-threaded' : 'single-threaded')
+
+  if (!mtLoaded) {
     const stURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
     await ffmpeg.load({
       coreURL: await toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript'),
@@ -59,25 +93,53 @@ export async function renderReel(opts: {
 
   try {
     const photoBuffers = await Promise.all(photos.map(p => fetchFile(p.url)))
+
+    // Detect landscape orientation for each photo so Ken Burns pans the right axis.
+    const isLandscape = await Promise.all(
+      photoBuffers.map(async (buf) => {
+        const { width, height } = await getImageDimensions(buf)
+        return width > height
+      })
+    )
+
     for (let i = 0; i < photoBuffers.length; i++) {
       await ffmpeg.writeFile(`photo${i}.jpg`, photoBuffers[i])
     }
     await ffmpeg.writeFile('music.mp3', await fetchFile(musicUrl))
 
     // Ken Burns via animated crop+scale.
-    // Scale to 1.15× for zoom headroom, then animate the crop window using `n` (frame number).
-    //   zoom-in  (even): large crop → small crop  (scene gets closer)
-    //   zoom-out (odd):  small crop → large crop  (scene pulls back)
-    // The final scale=1080:1920 normalises output regardless of intermediate crop size.
-    // NOTE: these expressions work fine in a simple -vf pipeline but deadlock in
-    // filter_complex concat (concurrent stream graph never gets EOF from looped inputs).
-    // That's why we encode each photo as its own exec() call and concat afterwards.
+    //
+    // Portrait photos (width ≤ height):
+    //   prep — scale to 1.08× (ZOOMED_W×ZOOMED_H) then crop to exact size
+    //   animate — zoom-in (even): crop window shrinks + drifts diagonally toward the corner
+    //             zoom-out (odd): crop window grows from corner
+    //   The final scale=1080:1920 normalises output.
+    //
+    // Landscape photos (width > height):
+    //   prep — same scale+crop; the heavy horizontal crop already happens here
+    //   animate — pan horizontally only (x moves, y stays at HH centre)
+    //   This matches how the eye reads wide photos — left/right reveals, not up/down zoom.
+    //
+    // NOTE: these expressions work in a simple -vf pipeline but deadlock in filter_complex
+    // concat (looped streams never signal EOF to the concat filter).
+    // Solution: encode each photo as its own exec() call, then concat demuxer joins them.
     const kenBurns = (i: number): string => {
       const prep = [
         `scale=${ZOOMED_W}:${ZOOMED_H}:force_original_aspect_ratio=increase`,
         `crop=${ZOOMED_W}:${ZOOMED_H}`,
         'setsar=1',
       ].join(',')
+
+      if (isLandscape[i]) {
+        // Horizontal pan: x slides across DW pixels, y is fixed at vertical centre (HH).
+        // Even → left-to-right; odd → right-to-left.
+        const x = i % 2 === 0
+          ? `${DW}*n/${range}`
+          : `${DW}-${DW}*n/${range}`
+        return `${prep},crop=w=1080:h=1920:x='${x}':y=${HH},scale=1080:1920,setsar=1`
+      }
+
+      // Portrait: zoom-in/out with diagonal drift
       if (i % 2 === 0) {
         const w = `${ZOOMED_W}-${DW}*n/${range}`
         const h = `${ZOOMED_H}-${DH}*n/${range}`

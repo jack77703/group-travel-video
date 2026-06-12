@@ -69,7 +69,17 @@ export default function ReelPage() {
   const isStuck = roomStatus === 'generating' && (status === 'not_started' || status === 'processing')
 
   return (
-    <main className="flex h-dvh flex-col items-center justify-center bg-black px-6 text-white">
+    <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
+      <div className="flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => router.push('/')}
+          className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50 transition hover:border-white/30 hover:text-white/80"
+        >
+          ← Home
+        </button>
+      </div>
+      <div className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-sm space-y-5 text-center">
         {status === 'failed' || error ? (
           <div className="space-y-4">
@@ -118,6 +128,7 @@ export default function ReelPage() {
             </div>
           </>
         )}
+      </div>
       </div>
     </main>
   )
