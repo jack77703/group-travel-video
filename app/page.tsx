@@ -42,7 +42,7 @@ export default function Home() {
                       className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 transition active:bg-white/[0.09]"
                     >
                       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-200/15 text-sm font-bold text-amber-200">
-                        {s.roomName.slice(0, 2).toUpperCase()}
+                        {s.roomName?.slice(0, 2).toUpperCase() ?? '?'}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-white">{s.roomName}</p>
