@@ -14,8 +14,6 @@ type Track = {
   image: string
 }
 
-type Animation = 'zoom-in' | 'zoom-out' | 'static'
-
 const MOODS = [
   { label: 'Ambient', tag: 'ambient' },
   { label: 'Epic', tag: 'epic' },
@@ -37,15 +35,17 @@ function formatDuration(seconds: number) {
 function loadSavedSettings(code: string) {
   try {
     const raw = localStorage.getItem(`reel_generate_settings_${code}`)
-    return raw ? (JSON.parse(raw) as { mood: string; track: Track; pace: number; animation: Animation }) : null
+    return raw ? (JSON.parse(raw) as { mood: string; track: Track; pace: number }) : null
   } catch {
     return null
   }
 }
 
-function saveSettings(code: string, s: { mood: string; track: Track; pace: number; animation: Animation }) {
+function saveSettings(code: string, s: { mood: string; track: Track; pace: number }) {
   localStorage.setItem(`reel_generate_settings_${code}`, JSON.stringify(s))
 }
+
+type Status = 'idle' | 'loading-encoder' | 'encoding' | 'uploading'
 
 export default function GeneratePage() {
   const router = useRouter()
@@ -58,11 +58,10 @@ export default function GeneratePage() {
   const [selected, setSelected] = useState<Track | null>(null)
   const [previewing, setPreviewing] = useState<string | null>(null)
   const [pace, setPace] = useState(2)
-  const [animation, setAnimation] = useState<Animation>('zoom-in')
-  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState<Status>('idle')
+  const [pct, setPct] = useState(0)
   const [error, setError] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  // Track ID to pre-select once tracks load (used for Generate Again pre-fill)
   const pendingTrackIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -73,7 +72,6 @@ export default function GeneratePage() {
     const saved = loadSavedSettings(code)
     if (saved) {
       setPace(saved.pace ?? 2)
-      setAnimation(saved.animation ?? 'zoom-in')
       if (saved.mood) {
         pendingTrackIdRef.current = saved.track?.id ?? null
         setSelectedMood(saved.mood)
@@ -130,11 +128,12 @@ export default function GeneratePage() {
       return
     }
 
-    setLoading(true)
+    setStatus('idle')
     setError('')
+    setPct(0)
 
     try {
-      const res = await fetch(`/api/rooms/${code}/generate`, {
+      const genRes = await fetch(`/api/rooms/${code}/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,21 +143,64 @@ export default function GeneratePage() {
           music_url: selected.url,
           music_name: `${selected.name} — ${selected.artist}`,
           photo_duration: pace,
-          animation,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const genData = await genRes.json()
+      if (!genRes.ok) throw new Error(genData.error)
 
       if (selectedMood) {
-        saveSettings(code, { mood: selectedMood, track: selected, pace, animation })
+        saveSettings(code, { mood: selectedMood, track: selected, pace })
       }
+
+      setStatus('loading-encoder')
+      const { renderReel } = await import('@/lib/ffmpeg-renderer')
+
+      setStatus('encoding')
+      const musicUrl = `/api/proxy-audio?url=${encodeURIComponent(selected.url)}`
+      const blob = await renderReel({
+        photos: genData.photos,
+        musicUrl,
+        photoDuration: pace,
+        onProgress: setPct,
+      })
+
+      const uploadUrlRes = await fetch(`/api/rooms/${code}/reel/upload-url`, {
+        headers: { 'x-initiator-token': initiatorToken },
+      })
+      const uploadUrlData = await uploadUrlRes.json()
+      if (!uploadUrlRes.ok) throw new Error('Failed to get upload URL')
+
+      setStatus('uploading')
+      const putRes = await fetch(uploadUrlData.signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'video/mp4' },
+        body: blob,
+      })
+      if (!putRes.ok) throw new Error('Upload failed')
+
+      await fetch(`/api/rooms/${code}/reel/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-initiator-token': initiatorToken,
+        },
+        body: JSON.stringify({ storage_path: uploadUrlData.path }),
+      })
+
       router.push(`/room/${code}/reel`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
+      setStatus('idle')
     }
+  }
+
+  const busy = status !== 'idle'
+
+  function statusLabel() {
+    if (status === 'loading-encoder') return 'Loading encoder…'
+    if (status === 'encoding') return `Encoding… ${pct}%`
+    if (status === 'uploading') return 'Uploading…'
+    return 'Generate Reel'
   }
 
   return (
@@ -168,13 +210,13 @@ export default function GeneratePage() {
           <h1 className="text-3xl font-black tracking-tight">Pick a vibe</h1>
         </div>
 
-        {/* Mood grid — 3×3, all visible at once */}
         <div className="flex-shrink-0 grid grid-cols-3 gap-2">
           {MOODS.map(({ label, tag }) => (
             <button
               key={tag}
               type="button"
               onClick={() => setSelectedMood(tag)}
+              disabled={busy}
               className={`rounded-2xl py-3 text-sm font-semibold transition ${
                 selectedMood === tag
                   ? 'bg-amber-200 text-black'
@@ -186,7 +228,6 @@ export default function GeneratePage() {
           ))}
         </div>
 
-        {/* Track list */}
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {fetchingTracks && (
             <div className="flex justify-center py-6">
@@ -205,7 +246,7 @@ export default function GeneratePage() {
             return (
               <div
                 key={track.id}
-                onClick={() => setSelected(track)}
+                onClick={() => !busy && setSelected(track)}
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition ${
                   isSelected
                     ? 'border-amber-200/60 bg-amber-200/10'
@@ -235,7 +276,6 @@ export default function GeneratePage() {
           })}
         </div>
 
-        {/* Pace slider */}
         <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-sm font-medium text-white/70">Pace</span>
@@ -248,6 +288,7 @@ export default function GeneratePage() {
             step={1}
             value={pace}
             onChange={(e) => setPace(Number(e.target.value))}
+            disabled={busy}
             className="w-full accent-amber-200"
           />
           <div className="mt-0.5 flex justify-between text-xs text-white/30">
@@ -256,23 +297,20 @@ export default function GeneratePage() {
           </div>
         </div>
 
-        {/* Animation picker */}
-        <div className="flex-shrink-0 grid grid-cols-3 gap-2">
-          {(['zoom-in', 'zoom-out', 'static'] as Animation[]).map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => setAnimation(a)}
-              className={`rounded-2xl border py-2 text-sm font-semibold transition ${
-                animation === a
-                  ? 'border-amber-200/60 bg-amber-200/10 text-amber-200'
-                  : 'border-white/10 bg-white/[0.04] text-white/50 hover:border-white/20 hover:text-white/80'
-              }`}
-            >
-              {a === 'zoom-in' ? 'Zoom In' : a === 'zoom-out' ? 'Zoom Out' : 'Static'}
-            </button>
-          ))}
-        </div>
+        {status === 'encoding' && (
+          <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-white/50">
+              <span>Encoding video</span>
+              <span>{pct}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-white/10">
+              <div
+                className="h-1.5 rounded-full bg-amber-200 transition-all"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {error && (
           <p className="flex-shrink-0 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -283,10 +321,10 @@ export default function GeneratePage() {
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={!selected || loading}
+          disabled={!selected || busy}
           className="flex-shrink-0 w-full rounded-2xl bg-white px-5 py-3 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {loading ? 'Starting generation...' : 'Generate Reel'}
+          {statusLabel()}
         </button>
       </div>
     </main>

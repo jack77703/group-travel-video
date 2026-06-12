@@ -62,7 +62,7 @@ export async function renderReel(opts: {
     onProgress?.(100)
 
     const data = await ffmpeg.readFile('output.mp4')
-    return new Blob([data as Uint8Array], { type: 'video/mp4' })
+    return new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' })
   } finally {
     ffmpeg.terminate()
   }
