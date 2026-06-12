@@ -10,7 +10,7 @@ const DH = ZOOMED_H - 1920 // 154
 
 function getImageDimensions(buffer: Uint8Array): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
-    const blob = new Blob([buffer], { type: 'image/jpeg' })
+    const blob = new Blob([Uint8Array.from(buffer)], { type: 'image/jpeg' })
     const url = URL.createObjectURL(blob)
     const img = new Image()
     img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight }) }
