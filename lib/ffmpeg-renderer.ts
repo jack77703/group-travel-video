@@ -50,18 +50,25 @@ export async function renderReel(opts: {
   const sabAvailable = typeof SharedArrayBuffer !== 'undefined'
   console.info('[ffmpeg] SharedArrayBuffer available:', sabAvailable)
 
+  // Wrap any promise with a hard deadline so a hanging CDN fetch can never
+  // block the page indefinitely.
+  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
+
   const mtLoaded = sabAvailable && await (async () => {
     try {
       const mtURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
-      const [coreURL, wasmURL, workerURL] = await Promise.all([
-        toBlobURL(`${mtURL}/ffmpeg-core.js`,        'text/javascript'),
-        toBlobURL(`${mtURL}/ffmpeg-core.wasm`,      'application/wasm'),
-        toBlobURL(`${mtURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-      ])
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('MT load timeout')), 15000)
+      // Download (25 MB) + load both get their own ceiling. Previously only
+      // ffmpeg.load() was guarded, so a hung toBlobURL fetch would hang forever.
+      const [coreURL, wasmURL, workerURL] = await withTimeout(
+        Promise.all([
+          toBlobURL(`${mtURL}/ffmpeg-core.js`,        'text/javascript'),
+          toBlobURL(`${mtURL}/ffmpeg-core.wasm`,      'application/wasm'),
+          toBlobURL(`${mtURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+        ]),
+        25000,
       )
-      await Promise.race([ffmpeg.load({ coreURL, wasmURL, workerURL }), timeout])
+      await withTimeout(ffmpeg.load({ coreURL, wasmURL, workerURL }), 15000)
       return true
     } catch { return false }
   })()
@@ -70,10 +77,14 @@ export async function renderReel(opts: {
 
   if (!mtLoaded) {
     const stURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript'),
-      wasmURL: await toBlobURL(`${stURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    })
+    const [coreURL, wasmURL] = await withTimeout(
+      Promise.all([
+        toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript'),
+        toBlobURL(`${stURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      ]),
+      30000,
+    )
+    await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 15000)
   }
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
