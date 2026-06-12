@@ -46,8 +46,8 @@ export async function POST(
   if (room.created_by_token !== initiator_token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
-  if (room.status !== 'open') {
-    return NextResponse.json({ error: 'Reel already generating or done' }, { status: 409 })
+  if (room.status === 'done') {
+    return NextResponse.json({ error: 'Reel already done' }, { status: 409 })
   }
 
   const { data: rawPhotos } = await supabase
