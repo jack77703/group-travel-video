@@ -63,8 +63,10 @@ export default function ReelPage() {
     }
   }
 
-  // Stuck: room is generating but no reel entry exists (client-side encode was interrupted)
-  const isStuck = roomStatus === 'generating' && status === 'not_started'
+  // Stuck: room is generating but reel will never complete
+  // - 'not_started': encode was interrupted before /reel/complete
+  // - 'processing': leftover Creatomate entry that will never receive a webhook
+  const isStuck = roomStatus === 'generating' && (status === 'not_started' || status === 'processing')
 
   return (
     <main className="flex h-dvh flex-col items-center justify-center bg-black px-6 text-white">
