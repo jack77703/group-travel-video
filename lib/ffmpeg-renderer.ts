@@ -24,8 +24,9 @@ export async function renderReel(opts: {
   musicUrl: string
   photoDuration: number
   onProgress?: (pct: number) => void
+  onEncoderReady?: () => void
 }): Promise<Blob> {
-  const { photos, musicUrl, photoDuration, onProgress } = opts
+  const { photos, musicUrl, photoDuration, onProgress, onEncoderReady } = opts
 
   if (photos.length === 0) throw new Error('No photos provided')
 
@@ -74,6 +75,11 @@ export async function renderReel(opts: {
       wasmURL: await toBlobURL(`${stURL}/ffmpeg-core.wasm`, 'application/wasm'),
     })
   }
+
+  // Core is loaded — signal caller so UI can transition from "Loading encoder"
+  // to "Encoding". Without this, the progress bar sits at 0% during WASM load
+  // (up to 15s on mobile) making it look frozen.
+  onEncoderReady?.()
 
   try {
     const photoBuffers = await Promise.all(photos.map(p => fetchFile(p.url)))

@@ -155,13 +155,13 @@ export default function GeneratePage() {
       setStatus('loading-encoder')
       const { renderReel } = await import('@/lib/ffmpeg-renderer')
 
-      setStatus('encoding')
       const musicUrl = `/api/proxy-audio?url=${encodeURIComponent(selected.url)}`
       const blob = await renderReel({
         photos: genData.photos,
         musicUrl,
         photoDuration: pace,
         onProgress: setPct,
+        onEncoderReady: () => setStatus('encoding'),
       })
 
       const uploadUrlRes = await fetch(`/api/rooms/${code}/reel/upload-url`, {
