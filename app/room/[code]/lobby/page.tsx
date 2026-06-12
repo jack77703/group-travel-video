@@ -4,7 +4,7 @@ import { RealtimeChannel } from '@supabase/supabase-js'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
-import { getInitiatorToken } from '@/lib/session'
+import { getInitiatorToken, getSession } from '@/lib/session'
 import { getSupabaseClient } from '@/lib/supabase-client'
 import type { MemberPublic, RoomPublic } from '@/lib/types'
 
@@ -14,6 +14,7 @@ export default function LobbyPage() {
   const code = (params.code as string).toUpperCase()
   const [room, setRoom] = useState<RoomPublic | null>(null)
   const [isInitiator, setIsInitiator] = useState(false)
+  const [myMemberId, setMyMemberId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -37,6 +38,7 @@ export default function LobbyPage() {
     let cancelled = false
 
     setIsInitiator(!!getInitiatorToken(code))
+    setMyMemberId(getSession(code)?.memberId ?? null)
 
     async function subscribeToLobby() {
       await loadRoom()
@@ -210,11 +212,23 @@ export default function LobbyPage() {
           </button>
         )}
 
-        {room.status === 'open' && !isInitiator && (
-          <p className="py-3 text-center text-sm text-white/40">
-            Waiting for the host to generate the reel...
-          </p>
-        )}
+        {room.status === 'open' && !isInitiator && (() => {
+          const myMember = room.members.find((m: MemberPublic) => m.id === myMemberId)
+          const hasUploaded = myMember ? myMember.photos_uploaded > 0 : true
+          return hasUploaded ? (
+            <p className="py-3 text-center text-sm text-white/40">
+              Waiting for the host to generate the reel...
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => router.push(`/room/${code}/upload`)}
+              className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99]"
+            >
+              Upload your photos
+            </button>
+          )
+        })()}
 
         {room.status === 'generating' && (
           isInitiator ? (
