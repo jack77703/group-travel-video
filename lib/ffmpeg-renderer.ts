@@ -57,7 +57,7 @@ export async function renderReel(opts: {
   // ST handles all encoding and produces identical output.
   console.info('[ffmpeg] core: single-threaded')
 
-  const stURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+  const stURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd'
   const [coreURL, wasmURL] = await withTimeout(
     Promise.all([
       toBlobURL(`${stURL}/ffmpeg-core.js`,  'text/javascript'),

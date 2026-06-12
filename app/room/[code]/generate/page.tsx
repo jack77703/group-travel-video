@@ -197,7 +197,10 @@ export default function GeneratePage() {
 
       router.push(`/room/${code}/reel`)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      setError(msg === 'timeout'
+        ? 'Video encoder took too long to load. Check your connection and tap Generate again.'
+        : msg)
       setStatus('idle')
       // Reset room status so the user can try again without getting stuck.
       // keepalive ensures the request survives page unload — without it the
