@@ -1,7 +1,8 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
-const TRANSITION_DURATION = 0.5 // seconds, crossfade overlap between photos
+const OUTPUT_FPS = 30
+const ZOOM_MAGNITUDE = 0.15 // photos zoom between 1.0 and 1.15 (Ken Burns)
 
 export async function renderReel(opts: {
   photos: { url: string }[]
@@ -13,18 +14,9 @@ export async function renderReel(opts: {
 
   if (photos.length === 0) throw new Error('No photos provided')
 
-  if (photoDuration <= TRANSITION_DURATION) {
-    throw new Error(
-      `photoDuration (${photoDuration}s) must be greater than transition duration (${TRANSITION_DURATION}s)`
-    )
-  }
-
   const ffmpeg = new FFmpeg()
 
-  // Total output duration is shorter than a hard-cut slideshow because transitions overlap
-  const totalDuration =
-    photos.length * photoDuration - (photos.length - 1) * TRANSITION_DURATION
-  const totalFrames = Math.round(totalDuration * 30)
+  const totalFrames = photos.length * photoDuration * OUTPUT_FPS
 
   ffmpeg.on('log', ({ message }) => {
     if (!onProgress) return
@@ -44,7 +36,6 @@ export async function renderReel(opts: {
   })
 
   try {
-    // Fetch all photos in parallel, then write to virtual FS serially
     const photoBuffers = await Promise.all(photos.map((p) => fetchFile(p.url)))
     for (let i = 0; i < photoBuffers.length; i++) {
       await ffmpeg.writeFile(`photo${i}.jpg`, photoBuffers[i])
@@ -53,48 +44,44 @@ export async function renderReel(opts: {
 
     const args: string[] = []
 
-    // One looping still-image input per photo, each capped at photoDuration
     for (let i = 0; i < photos.length; i++) {
-      args.push('-framerate', '30', '-loop', '1', '-t', String(photoDuration), '-i', `photo${i}.jpg`)
+      args.push('-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', `photo${i}.jpg`)
     }
-    // Music is the last input (index = photos.length)
     args.push('-i', 'music.mp3')
 
-    const scaleFilter =
-      'scale=1080:1920:force_original_aspect_ratio=decrease,' +
-      'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1'
+    // Crop-to-fill so zoompan never pans into black letterbox bars
+    const coverScale = 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1'
+    const frames = Math.round(photoDuration * OUTPUT_FPS)
+    // Per-frame zoom increment so the full ZOOM_MAGNITUDE is covered exactly in `frames` frames
+    const zinc = (ZOOM_MAGNITUDE / frames).toFixed(6)
+    const zoomMax = (1.0 + ZOOM_MAGNITUDE).toFixed(2)
+
+    // Even photos zoom in (1.0→1.15), odd photos zoom out (1.15→1.0) — alternating feels dynamic
+    const zoompan = (i: number) => {
+      const zExpr = i % 2 === 0
+        ? `min(1.0+${zinc}*on,${zoomMax})`
+        : `max(${zoomMax}-${zinc}*on,1.0)`
+      return `zoompan=z='${zExpr}':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=${OUTPUT_FPS}`
+    }
 
     if (photos.length === 1) {
-      // Single photo: no xfade needed, use simple -vf
       args.push(
-        '-vf', scaleFilter,
-        '-r', '30',
+        '-vf', `${coverScale},${zoompan(0)}`,
         '-map', '0:v',
-        '-map', `${photos.length}:a`,
+        '-map', '1:a',
       )
     } else {
-      // Build filter_complex: scale each input, then chain xfade dissolves
       const filterParts: string[] = []
-
       for (let i = 0; i < photos.length; i++) {
-        filterParts.push(`[${i}:v]${scaleFilter}[v${i}]`)
+        filterParts.push(`[${i}:v]${coverScale},${zoompan(i)}[v${i}]`)
       }
-
-      let lastLabel = 'v0'
-      for (let i = 1; i < photos.length; i++) {
-        const offset = i * (photoDuration - TRANSITION_DURATION)
-        const outLabel = i === photos.length - 1 ? 'vout' : `x${i}`
-        filterParts.push(
-          `[${lastLabel}][v${i}]xfade=transition=fade:duration=${TRANSITION_DURATION}:offset=${offset}[${outLabel}]`
-        )
-        lastLabel = outLabel
-      }
+      const concatInputs = Array.from({ length: photos.length }, (_, i) => `[v${i}]`).join('')
+      filterParts.push(`${concatInputs}concat=n=${photos.length}:v=1:a=0[vout]`)
 
       args.push(
         '-filter_complex', filterParts.join(';'),
         '-map', '[vout]',
         '-map', `${photos.length}:a`,
-        '-r', '30',
       )
     }
 
