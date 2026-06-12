@@ -26,14 +26,18 @@ export async function renderReel(opts: {
 
   // Progress tracks across multiple exec calls (clips 0-90%, concat 90-100%)
   let clipsDone = 0
+  let lastPct = 0
   ffmpeg.on('log', ({ message }) => {
     console.debug('[ffmpeg]', message)
     if (!onProgress) return
     const match = message.match(/frame=\s*(\d+)/)
     if (match) {
       const f = Math.min(parseInt(match[1]), frames)
-      const pct = Math.round(((clipsDone * frames + f) / (photos.length * frames)) * 90)
-      onProgress(Math.min(90, pct))
+      const pct = Math.min(90, Math.round(((clipsDone * frames + f) / (photos.length * frames)) * 90))
+      if (pct > lastPct) {
+        lastPct = pct
+        onProgress(pct)
+      }
     }
   })
 
@@ -113,7 +117,8 @@ export async function renderReel(opts: {
         ])
         if (code !== 0) throw new Error(`Failed to encode photo ${i} (exit ${code})`)
         clipsDone++
-        onProgress?.(Math.round((clipsDone / photos.length) * 90))
+        lastPct = Math.round((clipsDone / photos.length) * 90)
+        onProgress?.(lastPct)
       }
 
       // Join clips + audio with the concat demuxer (no re-encoding of video).
