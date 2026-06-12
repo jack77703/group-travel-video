@@ -35,11 +35,12 @@ export async function renderReel(opts: {
     }
   })
 
-  // Single-threaded core — no SharedArrayBuffer / COOP-COEP headers needed
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+  // Multi-threaded core — requires SharedArrayBuffer (COOP/COEP headers in next.config.mjs)
+  const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd'
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    coreURL:   await toBlobURL(`${baseURL}/ffmpeg-core.js`,        'text/javascript'),
+    wasmURL:   await toBlobURL(`${baseURL}/ffmpeg-core.wasm`,      'application/wasm'),
+    workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
   })
 
   try {
