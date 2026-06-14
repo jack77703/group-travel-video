@@ -135,7 +135,7 @@ export default function LobbyPage() {
   const maxMembers = Math.min(20, Math.floor(60 / room.max_photos_per_member))
   const allZero = room.members.every((m: MemberPublic) => m.photos_uploaded === 0)
   const myMember = room.members.find((m: MemberPublic) => m.id === myMemberId)
-  const myHasUploaded = myMember ? myMember.photos_uploaded > 0 : true
+  const myHasUploaded = myMember ? myMember.photos_uploaded >= room.max_photos_per_member : true
   const fullyUploaded = (m: MemberPublic) => m.photos_uploaded >= room.max_photos_per_member
   const membersReady = room.members.filter(fullyUploaded).length
   const allReady = membersReady === room.members.length

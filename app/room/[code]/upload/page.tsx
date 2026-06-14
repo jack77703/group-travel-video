@@ -77,20 +77,28 @@ export default function UploadPage() {
     setSessionState(storedSession)
     fetch(`/api/rooms/${code}`)
       .then((r) => r.json())
-      .then((data) => setMaxPhotos(data.max_photos_per_member))
+      .then((data) => {
+        const me = (data.members ?? []).find((m: { id: string; photos_uploaded: number }) => m.id === storedSession.memberId)
+        const alreadyUploaded = me?.photos_uploaded ?? 0
+        setMaxPhotos(data.max_photos_per_member - alreadyUploaded)
+      })
       .catch(() => setError('Could not load room details'))
   }, [code, router])
 
   async function handleAddFiles(files: FileList | null) {
     if (!files) return
     const slotsLeft = maxPhotos - photos.length
-    const incoming = await Promise.all(
-      Array.from(files)
-        .filter((f) => f.type.startsWith('image/'))
-        .slice(0, slotsLeft)
-        .map(toJpeg)
-    )
-    setPhotos((prev) => [...prev, ...incoming])
+    try {
+      const incoming = await Promise.all(
+        Array.from(files)
+          .filter((f) => f.type.startsWith('image/'))
+          .slice(0, slotsLeft)
+          .map(toJpeg)
+      )
+      setPhotos((prev) => [...prev, ...incoming])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process image')
+    }
   }
 
   function removePhoto(index: number) {
@@ -106,13 +114,17 @@ export default function UploadPage() {
     if (!files || files.length === 0) return
     const file = files[0]
     if (!file.type.startsWith('image/')) return
-    const compressed = await toJpeg(file)
-    const idx = replaceIndexRef.current
-    setPhotos((prev) => {
-      const next = [...prev]
-      next[idx] = compressed
-      return next
-    })
+    try {
+      const compressed = await toJpeg(file)
+      const idx = replaceIndexRef.current
+      setPhotos((prev) => {
+        const next = [...prev]
+        next[idx] = compressed
+        return next
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process image')
+    }
     if (replaceInputRef.current) replaceInputRef.current.value = ''
   }
 
