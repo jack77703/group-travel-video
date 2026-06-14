@@ -19,6 +19,7 @@ export default function LobbyPage() {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
 
   const loadRoom = useCallback(async () => {
     try {
@@ -135,6 +136,10 @@ export default function LobbyPage() {
   const allZero = room.members.every((m: MemberPublic) => m.photos_uploaded === 0)
   const myMember = room.members.find((m: MemberPublic) => m.id === myMemberId)
   const myHasUploaded = myMember ? myMember.photos_uploaded > 0 : true
+  const fullyUploaded = (m: MemberPublic) => m.photos_uploaded >= room.max_photos_per_member
+  const membersReady = room.members.filter(fullyUploaded).length
+  const allReady = membersReady === room.members.length
+  const pendingMembers = room.members.filter((m: MemberPublic) => !fullyUploaded(m))
 
   return (
     <main className="flex h-dvh flex-col bg-black px-6 py-8 text-white">
@@ -160,14 +165,15 @@ export default function LobbyPage() {
       {/* Member list — only this area scrolls */}
       <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
         {room.members.map((member: MemberPublic) => {
-          const hasUploaded = member.photos_uploaded > 0
+          const done    = fullyUploaded(member)
+          const partial = !done && member.photos_uploaded > 0
           const initials = member.name.trim().split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
           return (
             <div
               key={member.id}
               className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.05] px-4 py-3"
             >
-              <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${hasUploaded ? 'bg-amber-200/20 text-amber-200' : 'bg-white/10 text-white/50'}`}>
+              <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? 'bg-amber-200/20 text-amber-200' : partial ? 'bg-amber-200/10 text-amber-200/60' : 'bg-white/10 text-white/50'}`}>
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
@@ -180,12 +186,15 @@ export default function LobbyPage() {
                   )}
                 </div>
                 <p className="text-xs text-white/35">
-                  {hasUploaded ? `${member.photos_uploaded} photo${member.photos_uploaded === 1 ? '' : 's'} ready` : 'waiting…'}
+                  {done
+                    ? `${member.photos_uploaded} photo${member.photos_uploaded === 1 ? '' : 's'} ready`
+                    : partial
+                    ? `uploading… (${member.photos_uploaded}/${room.max_photos_per_member})`
+                    : 'waiting…'}
                 </p>
               </div>
-              {hasUploaded && (
-                <div className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400" />
-              )}
+              {done && <div className="h-2 w-2 flex-shrink-0 rounded-full bg-emerald-400" />}
+              {partial && <div className="h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-amber-400" />}
             </div>
           )
         })}
@@ -216,7 +225,7 @@ export default function LobbyPage() {
         {room.status === 'open' && isInitiator && myHasUploaded && (
           <button
             type="button"
-            onClick={() => router.push(`/room/${code}/generate`)}
+            onClick={() => allReady ? router.push(`/room/${code}/generate`) : setShowGenerateConfirm(true)}
             disabled={allZero}
             className="w-full rounded-2xl bg-white px-5 py-4 text-lg font-bold text-black transition hover:scale-[1.01] hover:bg-amber-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-30"
           >
@@ -265,6 +274,11 @@ export default function LobbyPage() {
             >
               Watch the Reel →
             </button>
+            {!isInitiator && !myHasUploaded && (
+              <p className="text-center text-xs text-white/35 px-2">
+                Your photos weren't included. Ask the host to Generate Again to add them.
+              </p>
+            )}
             {isInitiator && (
               <button
                 type="button"
@@ -278,6 +292,47 @@ export default function LobbyPage() {
           </>
         )}
       </div>
+
+      {showGenerateConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4"
+          onClick={() => setShowGenerateConfirm(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-white/10 bg-[#141414] p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <p className="text-base font-bold">Not everyone is ready</p>
+              <div className="mt-2 space-y-1">
+                {pendingMembers.map((m) => (
+                  <p key={m.id} className="text-sm text-white/50">
+                    {m.photos_uploaded === 0
+                      ? `${m.name} hasn't uploaded any photos yet`
+                      : `${m.name} is still uploading (${m.photos_uploaded}/${room.max_photos_per_member} done)`}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => { setShowGenerateConfirm(false); router.push(`/room/${code}/generate`) }}
+                className="w-full rounded-2xl bg-white px-5 py-3 text-base font-bold text-black transition hover:bg-amber-100 active:scale-[0.99]"
+              >
+                Generate anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowGenerateConfirm(false)}
+                className="w-full py-2 text-sm text-white/40 transition hover:text-white/70"
+              >
+                Wait for everyone
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

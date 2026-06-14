@@ -72,7 +72,7 @@ export default function GeneratePage() {
     }
     const saved = loadSavedSettings(code)
     if (saved) {
-      setPace(saved.pace ?? 2)
+      setPace(Math.min(3, Math.max(1, saved.pace ?? 2)))
       if (saved.mood) {
         pendingTrackIdRef.current = saved.track?.id ?? null
         setSelectedMood(saved.mood)

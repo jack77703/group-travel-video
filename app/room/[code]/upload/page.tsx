@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getSession, Session } from '@/lib/session'
 
 async function toJpeg(file: File): Promise<File> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
     img.onload = () => {
@@ -20,13 +20,21 @@ async function toJpeg(file: File): Promise<File> {
       const canvas = document.createElement('canvas')
       canvas.width = w
       canvas.height = h
-      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas 2D context unavailable')); return }
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, w, h)
+      ctx.drawImage(img, 0, 0, w, h)
       canvas.toBlob(
-        (blob) => resolve(new File([blob!], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })),
+        (blob) => {
+          if (!blob) { reject(new Error('Image conversion failed — try again')); return }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }))
+        },
         'image/jpeg',
         0.92
       )
     }
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Failed to load image')) }
     img.src = objectUrl
   })
 }

@@ -73,6 +73,8 @@ export async function POST(
     photoItems.push({ url: data.signedUrl })
   }
 
+  console.log(`[generate] room=${params.code.toUpperCase()} db_photos=${rawPhotos.length} signed=${photoItems.length}`)
+
   if (photoItems.length === 0) {
     return NextResponse.json({ error: 'Could not access any uploaded photos' }, { status: 500 })
   }
