@@ -223,8 +223,18 @@ export async function renderReel(opts: {
         onProgress?.(lastPct)
       }
 
+      // duration is specified for every clip EXCEPT the last.
+      // The concat demuxer uses duration to know when to cut each segment; giving
+      // duration to the last clip causes FFmpeg to seek past end-of-file when the
+      // encoded clip is even one frame shorter than the stated duration — the last
+      // clip gets truncated or dropped. Without duration, it plays to natural end.
       const concatTxt = 'ffconcat version 1.0\n'
-        + photos.map((_, i) => `file 'clip${i}.mp4'\nduration ${photoDuration}`).join('\n')
+        + photos.map((_, i) => {
+          const isLast = i === photos.length - 1
+          return isLast
+            ? `file 'clip${i}.mp4'`
+            : `file 'clip${i}.mp4'\nduration ${photoDuration}`
+        }).join('\n')
       await ffmpeg.writeFile('clips.txt', concatTxt)
       onProgress?.(92)
 

@@ -63,12 +63,18 @@ export async function POST(
 
   const photoItems: Array<{ url: string }> = []
   for (const photo of photos) {
-    const { data } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from('photos')
       .createSignedUrl(photo.storage_path, 86400)
-    if (data?.signedUrl) {
-      photoItems.push({ url: data.signedUrl })
+    if (error || !data?.signedUrl) {
+      console.error('[generate] failed to sign URL for', photo.storage_path, error?.message)
+      continue
     }
+    photoItems.push({ url: data.signedUrl })
+  }
+
+  if (photoItems.length === 0) {
+    return NextResponse.json({ error: 'Could not access any uploaded photos' }, { status: 500 })
   }
 
   await supabase
