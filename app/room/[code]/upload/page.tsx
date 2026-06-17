@@ -10,7 +10,6 @@ async function toJpeg(file: File): Promise<File> {
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
     img.onload = () => {
-      URL.revokeObjectURL(objectUrl)
       const MAX = 3840
       let { naturalWidth: w, naturalHeight: h } = img
       if (w > MAX || h > MAX) {
@@ -21,12 +20,16 @@ async function toJpeg(file: File): Promise<File> {
       canvas.width = w
       canvas.height = h
       const ctx = canvas.getContext('2d')
-      if (!ctx) { reject(new Error('Canvas 2D context unavailable')); return }
+      if (!ctx) { URL.revokeObjectURL(objectUrl); reject(new Error('Canvas 2D context unavailable')); return }
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, w, h)
       ctx.drawImage(img, 0, 0, w, h)
       canvas.toBlob(
         (blob) => {
+          // Revoke after toBlob so iOS WebKit does not release the PNG pixel
+          // data before drawImage has finished — revoking earlier causes PNG
+          // screenshots to draw as blank white while JPEGs are unaffected.
+          URL.revokeObjectURL(objectUrl)
           if (!blob) { reject(new Error('Image conversion failed — try again')); return }
           resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }))
         },
