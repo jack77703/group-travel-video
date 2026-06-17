@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase-server'
 
 type PhotoRow = {
   storage_path: string
+  member_id: string
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -52,16 +53,30 @@ export async function POST(
 
   const { data: rawPhotos } = await supabase
     .from('photos')
-    .select('storage_path')
+    .select('storage_path, member_id')
     .eq('room_id', room.id)
 
   if (!rawPhotos || rawPhotos.length === 0) {
     return NextResponse.json({ error: 'No photos uploaded' }, { status: 400 })
   }
 
+  const { data: memberRows } = await supabase
+    .from('members')
+    .select('id, name, photos_uploaded')
+    .eq('room_id', room.id)
+
+  const memberName = (id: string) =>
+    memberRows?.find((m) => m.id === id)?.name ?? id.slice(0, 8)
+
   const photos = shuffle(rawPhotos as PhotoRow[])
 
+  const dbCounts: Record<string, number> = {}
+  for (const p of photos) {
+    dbCounts[p.member_id] = (dbCounts[p.member_id] ?? 0) + 1
+  }
+
   const photoItems: Array<{ url: string }> = []
+  const signedCounts: Record<string, number> = {}
   for (const photo of photos) {
     const { data, error } = await supabase.storage
       .from('photos')
@@ -70,10 +85,18 @@ export async function POST(
       console.error('[generate] failed to sign URL for', photo.storage_path, error?.message)
       continue
     }
+    signedCounts[photo.member_id] = (signedCounts[photo.member_id] ?? 0) + 1
     photoItems.push({ url: data.signedUrl })
   }
 
-  console.log(`[generate] room=${params.code.toUpperCase()} db_photos=${rawPhotos.length} signed=${photoItems.length}`)
+  const memberSummary = Object.keys(dbCounts).map((id) => {
+    const db = dbCounts[id] ?? 0
+    const signed = signedCounts[id] ?? 0
+    const counter = memberRows?.find((m) => m.id === id)?.photos_uploaded ?? '?'
+    return `${memberName(id)}(db=${db},signed=${signed},counter=${counter})`
+  }).join(' | ')
+
+  console.log(`[generate] room=${params.code.toUpperCase()} db_photos=${rawPhotos.length} signed=${photoItems.length} members=[${memberSummary}]`)
 
   if (photoItems.length === 0) {
     return NextResponse.json({ error: 'Could not access any uploaded photos' }, { status: 500 })
