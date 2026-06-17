@@ -347,6 +347,15 @@ export default function GeneratePage() {
           </div>
         )}
 
+        {status === 'loading-encoder' && dlPct >= 100 && (
+          <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-white/20 border-t-amber-200" />
+              <p className="text-xs text-white/50">Compiling encoder — first time may take up to a minute</p>
+            </div>
+          </div>
+        )}
+
         {status === 'encoding' && (
           <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3">
             <div className="mb-2 flex items-center justify-between text-xs text-white/50">

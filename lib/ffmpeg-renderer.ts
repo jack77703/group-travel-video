@@ -95,7 +95,7 @@ export async function renderReel(opts: {
     streamToBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm', onDownloadProgress),
   ])
   console.info('[ffmpeg] WASM ready, initialising core...')
-  await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 15000)
+  await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 90000)
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
   // to "Encoding". Without this, the progress bar sits at 0% during WASM load
