@@ -61,6 +61,7 @@ export default function GeneratePage() {
   const [status, setStatus] = useState<Status>('idle')
   const [pct, setPct] = useState(0)
   const [dlPct, setDlPct] = useState(0)
+  const [clipStatus, setClipStatus] = useState<{ current: number; total: number } | null>(null)
   const [error, setError] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const pendingTrackIdRef = useRef<string | null>(null)
@@ -133,6 +134,7 @@ export default function GeneratePage() {
     setError('')
     setPct(0)
     setDlPct(0)
+    setClipStatus(null)
 
     try {
       const genRes = await fetch(`/api/rooms/${code}/generate`, {
@@ -165,6 +167,7 @@ export default function GeneratePage() {
         onProgress: setPct,
         onEncoderReady: () => setStatus('encoding'),
         onDownloadProgress: setDlPct,
+        onClipStart: (i, total) => setClipStatus({ current: i, total }),
       })
 
       const uploadUrlRes = await fetch(`/api/rooms/${code}/reel/upload-url`, {
@@ -224,7 +227,10 @@ export default function GeneratePage() {
       if (dlPct > 0)    return `Downloading encoder… ${dlPct}%`
       return 'Loading encoder…'
     }
-    if (status === 'encoding') return `Encoding… ${pct}%`
+    if (status === 'encoding') {
+      if (clipStatus) return `Encoding photo ${clipStatus.current + 1} of ${clipStatus.total}… ${pct}%`
+      return `Encoding… ${pct}%`
+    }
     if (status === 'uploading') return 'Uploading…'
     return 'Generate Reel'
   }
@@ -359,7 +365,11 @@ export default function GeneratePage() {
         {status === 'encoding' && (
           <div className="flex-shrink-0 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3">
             <div className="mb-2 flex items-center justify-between text-xs text-white/50">
-              <span>Encoding video</span>
+              <span>
+                {clipStatus
+                  ? `Photo ${clipStatus.current + 1} / ${clipStatus.total}`
+                  : 'Encoding video'}
+              </span>
               <span>{pct}%</span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-white/10">

@@ -56,8 +56,11 @@ export async function renderReel(opts: {
   onProgress?: (pct: number) => void
   onEncoderReady?: () => void
   onDownloadProgress?: (pct: number) => void
+  onClipStart?: (clipIndex: number, total: number) => void
 }): Promise<Blob> {
   const { photos, musicUrl, photoDuration, onProgress, onEncoderReady, onDownloadProgress } = opts
+
+  console.info(`[renderer] starting: photos=${photos.length} pace=${photoDuration}s`)
 
   if (photos.length === 0) throw new Error('No photos provided')
 
@@ -104,6 +107,12 @@ export async function renderReel(opts: {
 
   try {
     const photoBuffers = await Promise.all(photos.map(p => fetchFile(p.url)))
+    const badBuffers = photoBuffers
+      .map((b, i) => ({ i, valid: b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF, size: b.byteLength }))
+      .filter(x => !x.valid || x.size < 2000)
+    if (badBuffers.length > 0) console.error('[renderer] suspicious buffers:', badBuffers)
+    console.info(`[renderer] buffer sizes: ${photoBuffers.map(b => b.byteLength).join(',')}`)
+
     const isLandscape = await Promise.all(
       photoBuffers.map(async (buf) => {
         const { width, height } = await getImageDimensions(buf)
@@ -208,6 +217,7 @@ export async function renderReel(opts: {
       if (code !== 0) throw new Error(`FFmpeg exited with code ${code}`)
     } else {
       for (let i = 0; i < photos.length; i++) {
+        opts.onClipStart?.(i, photos.length)
         const { vf, fc } = kenBurns(i)
         const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
         const code = await ffmpeg.exec([
