@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -6,6 +6,10 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const src  = join(root, 'node_modules/@ffmpeg/core-mt/dist/umd')
 const dest = join(root, 'public/ffmpeg-mt')
 
+if (!existsSync(src)) {
+  console.error(`Source not found: ${src}\nRun 'npm install' first.`)
+  process.exit(1)
+}
 mkdirSync(dest, { recursive: true })
 
 for (const file of ['ffmpeg-core.js', 'ffmpeg-core.wasm', 'ffmpeg-core.worker.js']) {
