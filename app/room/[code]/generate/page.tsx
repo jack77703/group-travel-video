@@ -82,6 +82,14 @@ export default function GeneratePage() {
   }, [code, router])
 
   useEffect(() => {
+    import('@/lib/ffmpeg-renderer').then(({ preloadEncoder }) => {
+      preloadEncoder().catch(() => {
+        // Preload failure is silent — renderReel will retry on Generate click
+      })
+    })
+  }, [])
+
+  useEffect(() => {
     if (!selectedMood) return
     setFetchingTracks(true)
     setTracks([])
