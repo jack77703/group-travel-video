@@ -48,6 +48,20 @@ let _blobCache: CoreBlobs | null = null
 let _preloadPromise: Promise<CoreBlobs> | null = null
 
 function _downloadBlobs(onProgress?: (pct: number) => void): Promise<CoreBlobs> {
+  // SharedArrayBuffer is required for the multi-threaded core. It's only
+  // available when COOP/COEP headers are present (iOS 15.2+, modern Android).
+  // Older devices fall back to the single-threaded core — no SAB needed there.
+  const useMT = typeof SharedArrayBuffer !== 'undefined'
+  console.info(`[ffmpeg] core: ${useMT ? 'multi-threaded' : 'single-threaded (no SharedArrayBuffer)'}`)
+  if (!useMT) {
+    return Promise.all([
+      streamToBlobURL('/ffmpeg/ffmpeg-core.js',   'text/javascript'),
+      streamToBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm', onProgress),
+    ]).then(([coreURL, wasmURL]) => {
+      _blobCache = { coreURL, wasmURL, workerURL: '' }
+      return _blobCache
+    })
+  }
   return Promise.all([
     streamToBlobURL('/ffmpeg-mt/ffmpeg-core.js',        'text/javascript'),
     streamToBlobURL('/ffmpeg-mt/ffmpeg-core.wasm',      'application/wasm', onProgress),
@@ -61,12 +75,17 @@ function _downloadBlobs(onProgress?: (pct: number) => void): Promise<CoreBlobs> 
 async function _getBlobs(onProgress?: (pct: number) => void): Promise<CoreBlobs> {
   if (_blobCache) { onProgress?.(100); return _blobCache }
   if (_preloadPromise) {
-    // Background preload already in flight — wait for it (can't pipe progress)
-    const blobs = await _preloadPromise
-    onProgress?.(100)
-    return blobs
+    try {
+      // Background preload already in flight — wait for it (can't pipe progress)
+      const blobs = await _preloadPromise
+      onProgress?.(100)
+      return blobs
+    } catch {
+      // Preload failed — clear so the next call can retry with progress reporting
+      _preloadPromise = null
+    }
   }
-  // Nothing started — download now with progress reporting
+  // Nothing started (or preload failed) — download now with progress reporting
   _preloadPromise = _downloadBlobs(onProgress)
   return _preloadPromise
 }
@@ -134,10 +153,18 @@ export async function renderReel(opts: {
   const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
     Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
 
-  console.info('[ffmpeg] acquiring MT WASM blobs...')
+  console.info('[ffmpeg] acquiring WASM blobs...')
   const { coreURL, wasmURL, workerURL } = await _getBlobs(onDownloadProgress)
-  console.info('[ffmpeg] WASM blobs ready, initialising multi-threaded core...')
-  await withTimeout(ffmpeg.load({ coreURL, wasmURL, workerURL }), 90000)
+  const coreLabel = workerURL ? 'multi-threaded' : 'single-threaded'
+  console.info(`[ffmpeg] WASM blobs ready, initialising ${coreLabel} core...`)
+  try {
+    const loadOpts = workerURL ? { coreURL, wasmURL, workerURL } : { coreURL, wasmURL }
+    await withTimeout(ffmpeg.load(loadOpts), 90000)
+  } catch (loadErr) {
+    // Emscripten sometimes throws non-Error values (strings, abort objects).
+    // Normalise so the catch in generate/page.tsx always sees an Error.message.
+    throw loadErr instanceof Error ? loadErr : new Error(`FFmpeg init failed: ${String(loadErr)}`)
+  }
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
   // to "Encoding". Without this, the progress bar sits at 0% during WASM load
