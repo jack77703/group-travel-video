@@ -31,12 +31,54 @@ async function streamToBlobURL(
   return URL.createObjectURL(new Blob(chunks.map(c => Uint8Array.from(c)), { type: mimeType }))
 }
 
-const OUTPUT_FPS = 30
+// 24 fps is cinema standard and imperceptibly different from 30 fps for
+// 2-3 s Ken Burns clips. Encodes 20% fewer frames with zero visible quality loss.
+const OUTPUT_FPS = 24
 const ZOOM_MAGNITUDE = 0.08
 const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1166
 const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2074
 const DW = ZOOMED_W - 1080 // 86
 const DH = ZOOMED_H - 1920 // 154
+
+// ─── Module-level WASM blob cache ─────────────────────────────────────────
+// Blob URLs are created once and reused for the lifetime of the page.
+// A second "Generate Again" in the same session skips the 31 MB download.
+type CoreBlobs = { coreURL: string; wasmURL: string; workerURL: string }
+let _blobCache: CoreBlobs | null = null
+let _preloadPromise: Promise<CoreBlobs> | null = null
+
+function _downloadBlobs(onProgress?: (pct: number) => void): Promise<CoreBlobs> {
+  return Promise.all([
+    streamToBlobURL('/ffmpeg-mt/ffmpeg-core.js',        'text/javascript'),
+    streamToBlobURL('/ffmpeg-mt/ffmpeg-core.wasm',      'application/wasm', onProgress),
+    streamToBlobURL('/ffmpeg-mt/ffmpeg-core.worker.js', 'text/javascript'),
+  ]).then(([coreURL, wasmURL, workerURL]) => {
+    _blobCache = { coreURL, wasmURL, workerURL }
+    return _blobCache
+  })
+}
+
+async function _getBlobs(onProgress?: (pct: number) => void): Promise<CoreBlobs> {
+  if (_blobCache) { onProgress?.(100); return _blobCache }
+  if (_preloadPromise) {
+    // Background preload already in flight — wait for it (can't pipe progress)
+    const blobs = await _preloadPromise
+    onProgress?.(100)
+    return blobs
+  }
+  // Nothing started — download now with progress reporting
+  _preloadPromise = _downloadBlobs(onProgress)
+  return _preloadPromise
+}
+
+/**
+ * Call on generate page mount to download MT WASM in the background while
+ * the user picks music. By the time they click Generate the download is done.
+ */
+export async function preloadEncoder(): Promise<void> {
+  if (_blobCache || _preloadPromise) return
+  _preloadPromise = _downloadBlobs() // silent — no progress callback
+}
 
 function getImageDimensions(buffer: Uint8Array): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
@@ -92,13 +134,10 @@ export async function renderReel(opts: {
   const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
     Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))])
 
-  console.info('[ffmpeg] downloading local WASM bundle...')
-  const [coreURL, wasmURL] = await Promise.all([
-    streamToBlobURL('/ffmpeg/ffmpeg-core.js',   'text/javascript'),
-    streamToBlobURL('/ffmpeg/ffmpeg-core.wasm', 'application/wasm', onDownloadProgress),
-  ])
-  console.info('[ffmpeg] WASM ready, initialising core...')
-  await withTimeout(ffmpeg.load({ coreURL, wasmURL }), 90000)
+  console.info('[ffmpeg] acquiring MT WASM blobs...')
+  const { coreURL, wasmURL, workerURL } = await _getBlobs(onDownloadProgress)
+  console.info('[ffmpeg] WASM blobs ready, initialising multi-threaded core...')
+  await withTimeout(ffmpeg.load({ coreURL, wasmURL, workerURL }), 90000)
 
   // Core is loaded — signal caller so UI can transition from "Loading encoder"
   // to "Encoding". Without this, the progress bar sits at 0% during WASM load
@@ -106,7 +145,10 @@ export async function renderReel(opts: {
   onEncoderReady?.()
 
   try {
-    const photoBuffers = await Promise.all(photos.map(p => fetchFile(p.url)))
+    const [photoBuffers, musicData] = await Promise.all([
+      Promise.all(photos.map(p => fetchFile(p.url))),
+      fetchFile(musicUrl),
+    ])
     const badBuffers = photoBuffers
       .map((b, i) => ({ i, valid: b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF, size: b.byteLength }))
       .filter(x => !x.valid || x.size < 2000)
@@ -122,7 +164,7 @@ export async function renderReel(opts: {
     for (let i = 0; i < photoBuffers.length; i++) {
       await ffmpeg.writeFile(`photo${i}.jpg`, photoBuffers[i])
     }
-    await ffmpeg.writeFile('music.mp3', await fetchFile(musicUrl))
+    await ffmpeg.writeFile('music.mp3', musicData)
 
     // ─── Ken Burns filters ────────────────────────────────────────────────────
     //
