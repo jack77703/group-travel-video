@@ -15,6 +15,12 @@ const nextConfig = {
           { key: 'Content-Type', value: 'application/wasm' },
         ],
       },
+      {
+        source: '/ffmpeg-mt/:file*.wasm',
+        headers: [
+          { key: 'Content-Type', value: 'application/wasm' },
+        ],
+      },
     ]
   },
 }

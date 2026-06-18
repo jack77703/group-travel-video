@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "postinstall": "node scripts/copy-ffmpeg-mt.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -17,6 +18,7 @@
     "react-dom": "^18"
   },
   "devDependencies": {
+    "@ffmpeg/core-mt": "^0.12.10",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
