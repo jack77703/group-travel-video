@@ -226,28 +226,24 @@ export async function renderReel(opts: {
       const xLeft = corner === 0 || corner === 2  // TL / BL → left edge anchored
       const yTop  = corner === 0 || corner === 1  // TL / TR → top edge anchored
 
-      if (i % 2 === 0) {
-        // zoom-in: crop shrinks toward the anchored corner
-        const w = `${ZOOMED_W}-${DW}*n/${range}`
-        const h = `${ZOOMED_H}-${DH}*n/${range}`
-        const x = xLeft ? '0' : `${DW}*n/${range}`
-        const y = yTop  ? '0' : `${DH}*n/${range}`
-        return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
-      } else {
-        // zoom-out: crop grows away from the anchored corner
-        const w = `${1080}+${DW}*n/${range}`
-        const h = `${1920}+${DH}*n/${range}`
-        const x = xLeft ? '0' : `${DW}-${DW}*n/${range}`
-        const y = yTop  ? '0' : `${DH}-${DH}*n/${range}`
-        return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
-      }
+      // All clips zoom-in toward the anchored corner — different corners give
+      // cinematic variety without zoom-out, which is too subtle to perceive at
+      // 8% magnitude over 2-3 s.
+      // Use `t` (timestamp in seconds) rather than `n` (frame index): `t` is
+      // derived from PTS and is always reliable for looped still image inputs,
+      // whereas `n` can be inconsistent across ffmpeg.exec() calls in WASM.
+      const w = `${ZOOMED_W}-${DW}*t/${photoDuration}`
+      const h = `${ZOOMED_H}-${DH}*t/${photoDuration}`
+      const x = xLeft ? '0' : `${DW}*t/${photoDuration}`
+      const y = yTop  ? '0' : `${DH}*t/${photoDuration}`
+      return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
     }
 
     const landscapeFilter = (i: number): string => {
       // pan direction alternates per photo
       const panX = i % 2 === 0
-        ? `${DW}*n/${range}`
-        : `${DW}-${DW}*n/${range}`
+        ? `${DW}*t/${photoDuration}`
+        : `${DW}-${DW}*t/${photoDuration}`
       // Background: fill 1080×1920, blur heavily, darken 25%
       // Foreground: scale to ZOOMED_W wide, crop 1080px wide with pan, overlay centred
       // Blur via scale-down + scale-up (bilinear). gblur=sigma=25 is O(radius²) per
