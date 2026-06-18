@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+import { getIp, rateLimit } from '@/lib/rate-limit'
+
 const VALID_MOODS = ['ambient', 'epic', 'happy', 'chill', 'romantic', 'upbeat', 'dark', 'jazz', 'electronic']
 
 export async function GET(request: NextRequest) {
+  if (!rateLimit(getIp(request), 30, 10 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
+  }
+
   const mood = request.nextUrl.searchParams.get('mood') ?? ''
 
   const url = new URL('https://api.jamendo.com/v3.0/tracks/')

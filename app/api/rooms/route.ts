@@ -2,12 +2,17 @@ import { randomBytes } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { createServerClient } from '@/lib/supabase-server'
+import { getIp, rateLimit } from '@/lib/rate-limit'
 
 function generateRoomCode(): string {
   return randomBytes(3).toString('hex').toUpperCase()
 }
 
 export async function POST(request: NextRequest) {
+  if (!rateLimit(getIp(request), 5, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many rooms created. Try again later.' }, { status: 429 })
+  }
+
   const body = await request.json()
   const { name, max_photos_per_member } = body
 

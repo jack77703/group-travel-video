@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { createServerClient } from '@/lib/supabase-server'
+import { getIp, rateLimit } from '@/lib/rate-limit'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { code: string } }
 ) {
+  if (!rateLimit(getIp(request), 10, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many join attempts. Try again later.' }, { status: 429 })
+  }
+
   const initiator_token = request.headers.get('x-initiator-token')
   const { name } = await request.json()
   if (!name?.trim()) {
