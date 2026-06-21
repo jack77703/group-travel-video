@@ -181,36 +181,21 @@ export async function renderReel(opts: {
       'setsar=1',
     ].join(',')
 
-    // Four directions that ALL include horizontal pan so every portrait clip
-    // has clearly visible motion regardless of index.
-    //
-    // Constraint: x + w = ZOOMED_W at all t (so crop never exceeds right edge).
-    // This forces pan-left ↔ zoom-out and pan-right ↔ zoom-in to be paired.
-    //
-    // dir 0 (i=0,4,...): zoom-out + pan left        (x: DW→0, w: 1080→ZOOMED_W, y: 0)
-    // dir 1 (i=1,5,...): zoom-in  + pan right       (x: 0→DW, w: ZOOMED_W→1080, y: 0)
-    // dir 2 (i=2,6,...): zoom-out + pan left + up   (x: DW→0, y: DH→0)
-    // dir 3 (i=3,7,...): zoom-in  + pan right + down (x: 0→DW, y: 0→DH)
-    //
-    // Use `t` (seconds) not `n` (frame count): `t` is PTS-derived and reliable
-    // for looped still-image inputs in WASM; `n` can skip across exec() calls.
-    const dir = i % 4
-    const zoomIn = dir % 2 === 1
-    const xExpr = zoomIn
-      ? `${DW}*t/${photoDuration}`              // 0→DW  (pan right)
-      : `${DW}-${DW}*t/${photoDuration}`        // DW→0  (pan left)
-    const wExpr = zoomIn
-      ? `${ZOOMED_W}-${DW}*t/${photoDuration}`  // zoom in
-      : `${1080}+${DW}*t/${photoDuration}`      // zoom out
-    const yExpr = dir === 2
-      ? `${DH}-${DH}*t/${photoDuration}`        // DH→0  (pan up)
-      : dir === 3
-      ? `${DH}*t/${photoDuration}`              // 0→DH  (pan down)
-      : '0'
-    const hExpr = zoomIn
-      ? `${ZOOMED_H}-${DH}*t/${photoDuration}`  // zoom in
-      : `${1920}+${DH}*t/${photoDuration}`      // zoom out
-    return `${prep},crop=w='${wExpr}':h='${hExpr}':x='${xExpr}':y='${yExpr}',scale=1080:1920,setsar=1`
+    // All clips zoom-in (crop shrinks from ZOOMED→1080) + pan right (x: 0→DW).
+    // This ensures every portrait clip has clearly visible horizontal motion.
+    // Zoom-out (crop grows) was reverted: when w starts at exactly the scale
+    // target (1080), FFmpeg WASM may skip the scale step for frame 0, then
+    // fails when the crop grows on frame 1 and the filter graph size is no
+    // longer consistent — exit 1.
+    // Odd clips also pan down (y: 0→DH) for visual variety.
+    // Use `t` (PTS seconds) — reliable for looped still images in WASM;
+    // `n` (frame count) can skip across exec() calls.
+    const panDown = i % 2 === 1
+    const x = `${DW}*t/${photoDuration}`
+    const w = `${ZOOMED_W}-${DW}*t/${photoDuration}`
+    const y = panDown ? `${DH}*t/${photoDuration}` : '0'
+    const h = `${ZOOMED_H}-${DH}*t/${photoDuration}`
+    return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
   }
 
   const landscapeFilter = (i: number): string => {
