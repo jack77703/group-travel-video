@@ -24,7 +24,12 @@ export class FFmpegPool {
     const opts = blobs.workerURL
       ? { coreURL: blobs.coreURL, wasmURL: blobs.wasmURL, workerURL: blobs.workerURL }
       : { coreURL: blobs.coreURL, wasmURL: blobs.wasmURL }
-    await Promise.all(this.instances.map(ff => ff.load(opts)))
+    // Load sequentially — parallel MT WASM init spawns nested sub-workers via
+    // SharedArrayBuffer and can race/exhaust thread limits on some devices.
+    for (const ff of this.instances) {
+      ff.on('log', ({ message }: { message: string }) => console.debug('[pool-ffmpeg]', message))
+      await ff.load(opts)
+    }
   }
 
   // Dispatch a task to instance[index % poolSize]. Tasks on the same instance

@@ -281,28 +281,56 @@ export async function renderReel(opts: {
     }
     onEncoderReady?.()
 
+    const encodeOneClip = async (ff: FFmpeg, i: number): Promise<Uint8Array> => {
+      await ff.writeFile('input.jpg', photoBuffers[i])
+      const { vf, fc } = kenBurns(i)
+      const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
+      const exitCode = await ff.exec([
+        '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
+        ...filterArgs,
+        '-r', String(OUTPUT_FPS),
+        '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
+        '-y', 'clip.mp4',
+      ])
+      if (exitCode !== 0) throw new Error(`Failed to encode photo ${i} (exit ${exitCode})`)
+      const data = await ff.readFile('clip.mp4')
+      return new Uint8Array(data as Uint8Array)
+    }
+
     let clipsDone = 0
-    const clipBuffers = await Promise.all(
-      photos.map((_, i) =>
-        pool.enqueue(i, async (ff) => {
-          await ff.writeFile('input.jpg', photoBuffers[i])
-          const { vf, fc } = kenBurns(i)
-          const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
-          const exitCode = await ff.exec([
-            '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
-            ...filterArgs,
-            '-r', String(OUTPUT_FPS),
-            '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
-            'clip.mp4',
-          ])
-          if (exitCode !== 0) throw new Error(`Failed to encode photo ${i} (exit ${exitCode})`)
-          const data = await ff.readFile('clip.mp4')
+    let clipBuffers: Uint8Array[]
+
+    try {
+      clipBuffers = await Promise.all(
+        photos.map((_, i) =>
+          pool.enqueue(i, async (ff) => {
+            const buf = await encodeOneClip(ff, i)
+            clipsDone++
+            onProgress?.(Math.round((clipsDone / photos.length) * 85))
+            return buf
+          })
+        )
+      )
+    } catch (poolErr) {
+      // Parallel encoding failed (thread exhaustion, init race, etc.).
+      // Fall back to sequential encoding on a single fresh instance.
+      console.warn('[renderer] parallel encode failed, falling back to sequential:', poolErr)
+      pool.terminateAll()
+      clipsDone = 0
+      clipBuffers = []
+      const seqFF = new FFmpeg()
+      seqFF.on('log', ({ message }: { message: string }) => console.debug('[seq-ffmpeg]', message))
+      try {
+        await seqFF.load(blobOpts)
+        for (let i = 0; i < photos.length; i++) {
+          clipBuffers.push(await encodeOneClip(seqFF, i))
           clipsDone++
           onProgress?.(Math.round((clipsDone / photos.length) * 85))
-          return new Uint8Array(data as Uint8Array)
-        })
-      )
-    )
+        }
+      } finally {
+        seqFF.terminate()
+      }
+    }
 
     pool.terminateAll()
     onProgress?.(88)
