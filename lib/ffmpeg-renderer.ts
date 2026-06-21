@@ -283,19 +283,51 @@ export async function renderReel(opts: {
     const encodeOneClip = async (ff: FFmpeg, i: number): Promise<Uint8Array> => {
       // .slice() creates a copy — @ffmpeg/ffmpeg transfers (detaches) the ArrayBuffer
       // via postMessage, so without a copy the original becomes unusable for retries.
-      await ff.writeFile('input.jpg', photoBuffers[i].slice())
-      const { vf, fc } = kenBurns(i)
-      const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
-      const exitCode = await ff.exec([
-        '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
-        ...filterArgs,
-        '-r', String(OUTPUT_FPS),
-        '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
-        '-y', 'clip.mp4',
-      ])
-      if (exitCode !== 0) throw new Error(`Failed to encode photo ${i} (exit ${exitCode})`)
-      const data = await ff.readFile('clip.mp4')
-      return new Uint8Array(data as Uint8Array)
+      const buf = photoBuffers[i].slice()
+
+      // Reject clearly invalid input before sending to FFmpeg — avoids a
+      // cryptic "exit 1" when the real cause is bad photo data.
+      if (buf.byteLength < 1000 || buf[0] !== 0xFF || buf[1] !== 0xD8) {
+        throw new Error(
+          `Photo ${i} is not a valid JPEG (size=${buf.byteLength}, ` +
+          `header=0x${buf[0]?.toString(16) ?? '??'}${buf[1]?.toString(16) ?? '??'})`
+        )
+      }
+
+      // Capture FFmpeg log lines during this exec so exit-1 errors appear in
+      // the thrown message — console.debug is filtered in DevTools by default
+      // and the user never sees the actual FFmpeg error.
+      const fflogs: string[] = []
+      const capture = ({ message }: { message: string }) => {
+        console.log(`[ffmpeg clip${i}]`, message)
+        fflogs.push(message)
+      }
+      ff.on('log', capture)
+
+      try {
+        await ff.writeFile('input.jpg', buf)
+        const { vf, fc } = kenBurns(i)
+        const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
+        console.log(`[renderer] encoding clip ${i}: landscape=${isLandscape[i]}, buf=${buf.byteLength}B`)
+        const exitCode = await ff.exec([
+          '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
+          ...filterArgs,
+          '-r', String(OUTPUT_FPS),
+          '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
+          '-y', 'clip.mp4',
+        ])
+        if (exitCode !== 0) {
+          const errLines = fflogs.filter(l => /error|invalid|failed|no such|unable/i.test(l))
+          const tail = (errLines.length ? errLines : fflogs).slice(-8)
+          throw new Error(
+            `Failed to encode photo ${i} (exit ${exitCode})\n` + tail.join('\n')
+          )
+        }
+        const data = await ff.readFile('clip.mp4')
+        return new Uint8Array(data as Uint8Array)
+      } finally {
+        ff.off('log', capture)
+      }
     }
 
     let clipsDone = 0
@@ -320,7 +352,7 @@ export async function renderReel(opts: {
       clipsDone = 0
       clipBuffers = []
       const seqFF = new FFmpeg()
-      seqFF.on('log', ({ message }: { message: string }) => console.debug('[seq-ffmpeg]', message))
+      seqFF.on('log', ({ message }: { message: string }) => console.log('[seq-ffmpeg]', message))
       try {
         await seqFF.load(blobOpts)
         for (let i = 0; i < photos.length; i++) {

@@ -27,7 +27,7 @@ export class FFmpegPool {
     // Load sequentially — parallel MT WASM init spawns nested sub-workers via
     // SharedArrayBuffer and can race/exhaust thread limits on some devices.
     for (const ff of this.instances) {
-      ff.on('log', ({ message }: { message: string }) => console.debug('[pool-ffmpeg]', message))
+      ff.on('log', ({ message }: { message: string }) => console.log('[pool-ffmpeg]', message))
       await ff.load(opts)
     }
   }
