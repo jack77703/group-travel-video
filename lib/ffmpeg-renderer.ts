@@ -282,7 +282,9 @@ export async function renderReel(opts: {
     onEncoderReady?.()
 
     const encodeOneClip = async (ff: FFmpeg, i: number): Promise<Uint8Array> => {
-      await ff.writeFile('input.jpg', photoBuffers[i])
+      // .slice() creates a copy — @ffmpeg/ffmpeg transfers (detaches) the ArrayBuffer
+      // via postMessage, so without a copy the original becomes unusable for retries.
+      await ff.writeFile('input.jpg', photoBuffers[i].slice())
       const { vf, fc } = kenBurns(i)
       const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
       const exitCode = await ff.exec([
