@@ -4,6 +4,7 @@ import { RealtimeChannel } from '@supabase/supabase-js'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
+import { preloadEncoder } from '@/lib/ffmpeg-renderer'
 import { getInitiatorToken, getSession } from '@/lib/session'
 import { getSupabaseClient } from '@/lib/supabase-client'
 import type { MemberPublic, RoomPublic } from '@/lib/types'
@@ -20,6 +21,10 @@ export default function LobbyPage() {
   const [copied, setCopied] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
+
+  // Warm up FFmpeg WASM in the background while users are on the lobby.
+  // By the time they reach the generate page the 31 MB download is already done.
+  useEffect(() => { preloadEncoder() }, [])
 
   const loadRoom = useCallback(async () => {
     try {

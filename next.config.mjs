@@ -10,15 +10,17 @@ const nextConfig = {
         ],
       },
       {
-        source: '/ffmpeg/:file*.wasm',
+        source: '/ffmpeg/:file*',
         headers: [
-          { key: 'Content-Type', value: 'application/wasm' },
+          { key: 'Content-Type',  value: 'application/wasm' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       {
-        source: '/ffmpeg-mt/:file*.wasm',
+        source: '/ffmpeg-mt/:file*',
         headers: [
-          { key: 'Content-Type', value: 'application/wasm' },
+          { key: 'Content-Type',  value: 'application/wasm' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
     ]
