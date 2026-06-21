@@ -181,22 +181,36 @@ export async function renderReel(opts: {
       'setsar=1',
     ].join(',')
 
-    // corner: 0=TL 1=TR 2=BL 3=BR
-    const corner = i % 4
-    const xLeft = corner === 0 || corner === 2  // TL / BL → left edge anchored
-    const yTop  = corner === 0 || corner === 1  // TL / TR → top edge anchored
-
-    // All clips zoom-in toward the anchored corner — different corners give
-    // cinematic variety without zoom-out, which is too subtle to perceive at
-    // 8% magnitude over 2-3 s.
-    // Use `t` (timestamp in seconds) rather than `n` (frame index): `t` is
-    // derived from PTS and is always reliable for looped still image inputs,
-    // whereas `n` can be inconsistent across ffmpeg.exec() calls in WASM.
-    const w = `${ZOOMED_W}-${DW}*t/${photoDuration}`
-    const h = `${ZOOMED_H}-${DH}*t/${photoDuration}`
-    const x = xLeft ? '0' : `${DW}*t/${photoDuration}`
-    const y = yTop  ? '0' : `${DH}*t/${photoDuration}`
-    return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
+    // Four directions that ALL include horizontal pan so every portrait clip
+    // has clearly visible motion regardless of index.
+    //
+    // Constraint: x + w = ZOOMED_W at all t (so crop never exceeds right edge).
+    // This forces pan-left ↔ zoom-out and pan-right ↔ zoom-in to be paired.
+    //
+    // dir 0 (i=0,4,...): zoom-out + pan left        (x: DW→0, w: 1080→ZOOMED_W, y: 0)
+    // dir 1 (i=1,5,...): zoom-in  + pan right       (x: 0→DW, w: ZOOMED_W→1080, y: 0)
+    // dir 2 (i=2,6,...): zoom-out + pan left + up   (x: DW→0, y: DH→0)
+    // dir 3 (i=3,7,...): zoom-in  + pan right + down (x: 0→DW, y: 0→DH)
+    //
+    // Use `t` (seconds) not `n` (frame count): `t` is PTS-derived and reliable
+    // for looped still-image inputs in WASM; `n` can skip across exec() calls.
+    const dir = i % 4
+    const zoomIn = dir % 2 === 1
+    const xExpr = zoomIn
+      ? `${DW}*t/${photoDuration}`              // 0→DW  (pan right)
+      : `${DW}-${DW}*t/${photoDuration}`        // DW→0  (pan left)
+    const wExpr = zoomIn
+      ? `${ZOOMED_W}-${DW}*t/${photoDuration}`  // zoom in
+      : `${1080}+${DW}*t/${photoDuration}`      // zoom out
+    const yExpr = dir === 2
+      ? `${DH}-${DH}*t/${photoDuration}`        // DH→0  (pan up)
+      : dir === 3
+      ? `${DH}*t/${photoDuration}`              // 0→DH  (pan down)
+      : '0'
+    const hExpr = zoomIn
+      ? `${ZOOMED_H}-${DH}*t/${photoDuration}`  // zoom in
+      : `${1920}+${DH}*t/${photoDuration}`      // zoom out
+    return `${prep},crop=w='${wExpr}':h='${hExpr}':x='${xExpr}':y='${yExpr}',scale=1080:1920,setsar=1`
   }
 
   const landscapeFilter = (i: number): string => {
