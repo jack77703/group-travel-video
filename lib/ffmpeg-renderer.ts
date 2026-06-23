@@ -195,19 +195,24 @@ export async function renderReel(opts: {
     // Odd clips also pan down (y: 0→DH) for visual variety.
     // Use `t` (PTS seconds) — reliable for looped still images in WASM;
     // `n` (frame count) can skip across exec() calls.
+    // Wrap in 2*floor(.../2) so w/h/x/y stay integer and even — raw
+    // expressions like `2074-154*t/2` evaluate to fractions at most frames
+    // and FFmpeg WASM rejects them with "Failed to configure input pad".
+    const dur = photoDuration
     const panDown = i % 2 === 1
-    const x = `${DW}*t/${photoDuration}`
-    const w = `${ZOOMED_W}-${DW}*t/${photoDuration}`
-    const y = panDown ? `${DH}*t/${photoDuration}` : '0'
-    const h = `${ZOOMED_H}-${DH}*t/${photoDuration}`
+    const x = `2*floor(${DW}*t/${dur}/2)`
+    const w = `2*floor((${ZOOMED_W}-${DW}*t/${dur})/2)`
+    const y = panDown ? `2*floor(${DH}*t/${dur}/2)` : '0'
+    const h = `2*floor((${ZOOMED_H}-${DH}*t/${dur})/2)`
     return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
   }
 
   const landscapeFilter = (i: number): string => {
-    // pan direction alternates per photo
+    // pan direction alternates per photo (integer x — same fractional issue as portrait)
+    const dur = photoDuration
     const panX = i % 2 === 0
-      ? `${DW}*t/${photoDuration}`
-      : `${DW}-${DW}*t/${photoDuration}`
+      ? `2*floor(${DW}*t/${dur}/2)`
+      : `2*floor((${DW}-${DW}*t/${dur})/2)`
     // Background: fill 1080×1920, blur heavily, darken 25%
     // Foreground: scale to ZOOMED_W wide, crop 1080px wide with pan, overlay centred
     // Blur via scale-down + scale-up (bilinear). gblur=sigma=25 is O(radius²) per
