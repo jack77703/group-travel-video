@@ -245,7 +245,7 @@ export async function renderReel(opts: {
       const { vf, fc } = kenBurns(0)
       const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
       const code = await ffmpeg.exec([
-        '-loop', '1', '-t', String(photoDuration), '-i', 'photo0.jpg',
+        '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'photo0.jpg',
         '-i', 'music.mp3',
         ...filterArgs,
         '-r', String(OUTPUT_FPS),
@@ -315,7 +315,7 @@ export async function renderReel(opts: {
         const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
         console.log(`[renderer] encoding clip ${i}: landscape=${isLandscape[i]}, buf=${buf.byteLength}B`)
         const exitCode = await ff.exec([
-          '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
+          '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
           ...filterArgs,
           '-r', String(OUTPUT_FPS),
           '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
