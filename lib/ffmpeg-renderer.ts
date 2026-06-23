@@ -50,11 +50,16 @@ let _blobCache: CoreBlobs | null = null
 let _preloadPromise: Promise<CoreBlobs> | null = null
 
 function _downloadBlobs(onProgress?: (pct: number) => void): Promise<CoreBlobs> {
-  // SharedArrayBuffer is required for the multi-threaded core. It's only
-  // available when COOP/COEP headers are present (iOS 15.2+, modern Android).
-  // Older devices fall back to the single-threaded core — no SAB needed there.
-  const useMT = typeof SharedArrayBuffer !== 'undefined'
-  console.info(`[ffmpeg] core: ${useMT ? 'multi-threaded' : 'single-threaded (no SharedArrayBuffer)'}`)
+  // Always use the single-threaded WASM core. The FFmpegPool already provides
+  // parallelism by running N separate Web Workers (one per FFmpeg instance).
+  // The MT WASM build (core-mt) compiles in pthreads support via Emscripten
+  // USE_PTHREADS, which pre-allocates a pthread Worker pool at ff.load() time.
+  // With 3–4 pool instances × that pthread pool, total Worker count can exceed
+  // mobile browser limits and cause silent exit 1 before any frame encodes.
+  // ST WASM has no pthread pool — it runs one Worker per FFmpeg instance, which
+  // is exactly what we want: pool-level parallelism, no nested-Worker risk.
+  const useMT = false
+  console.info('[ffmpeg] core: single-threaded WASM (pool provides clip-level parallelism)')
   if (!useMT) {
     return Promise.all([
       streamToBlobURL('/ffmpeg/ffmpeg-core.js',   'text/javascript'),
@@ -244,7 +249,6 @@ export async function renderReel(opts: {
         '-i', 'music.mp3',
         ...filterArgs,
         '-r', String(OUTPUT_FPS),
-        '-threads', '1',
         '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
         '-c:a', 'aac', '-b:a', '128k',
         '-shortest', '-movflags', '+faststart',
@@ -314,7 +318,6 @@ export async function renderReel(opts: {
           '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
           ...filterArgs,
           '-r', String(OUTPUT_FPS),
-          '-threads', '1',
           '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
           '-y', 'clip.mp4',
         ])
