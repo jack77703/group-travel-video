@@ -41,6 +41,13 @@ const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1166
 const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2074
 const DW = ZOOMED_W - 1080 // 86
 const DH = ZOOMED_H - 1920 // 154
+// Supabase Storage rejects uploads over the project file-size limit (~50 MB).
+const MAX_UPLOAD_BYTES = 45 * 1024 * 1024
+
+const VIDEO_ENCODE = [
+  '-c:v', 'libx264', '-crf', '28', '-maxrate', '2M', '-bufsize', '4M',
+  '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+] as const
 
 // ─── Module-level WASM blob cache ─────────────────────────────────────────
 // Blob URLs are created once and reused for the lifetime of the page.
@@ -104,6 +111,18 @@ export async function getWasmBlobs(onProgress?: (pct: number) => void): Promise<
 export async function preloadEncoder(): Promise<void> {
   if (_blobCache || _preloadPromise) return
   _preloadPromise = _downloadBlobs() // silent — no progress callback
+}
+
+function finalizeMp4Blob(data: Uint8Array): Blob {
+  const blob = new Blob([new Uint8Array(data)], { type: 'video/mp4' })
+  const mb = blob.size / (1024 * 1024)
+  console.info(`[renderer] output ${mb.toFixed(1)} MB`)
+  if (blob.size > MAX_UPLOAD_BYTES) {
+    throw new Error(
+      `Video is too large to upload (${mb.toFixed(0)} MB). Try fewer photos or a faster pace.`
+    )
+  }
+  return blob
 }
 
 function getImageDimensions(buffer: Uint8Array): Promise<{ width: number; height: number }> {
@@ -221,6 +240,19 @@ export async function renderReel(opts: {
       ? { fc: landscapeFilter(i) }
       : { vf: portraitFilter(i) }
 
+  // zoompan emits `d` output frames per input frame. Looping the image before
+  // zoompan multiplies frames (e.g. 48 inputs × 48 outputs) → huge files + 413.
+  const stillInputArgs = (inputFile: string, i: number): string[] =>
+    isLandscape[i]
+      ? ['-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', inputFile]
+      : ['-i', inputFile]
+
+  const clipVideoArgs = (): string[] => [
+    '-frames:v', String(clipFrames),
+    '-r', String(OUTPUT_FPS),
+    ...VIDEO_ENCODE,
+  ]
+
   // ─── Single photo: encode with audio in one pass ──────────────────────────
   if (photos.length === 1) {
     const ffmpeg = new FFmpeg()
@@ -238,19 +270,18 @@ export async function renderReel(opts: {
       const { vf, fc } = kenBurns(0)
       const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
       const code = await ffmpeg.exec([
-        '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'photo0.jpg',
+        ...stillInputArgs('photo0.jpg', 0),
         '-i', 'music.mp3',
         ...filterArgs,
-        '-r', String(OUTPUT_FPS),
-        '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
+        ...clipVideoArgs(),
         '-c:a', 'aac', '-b:a', '128k',
         '-shortest', '-movflags', '+faststart',
-        'output.mp4',
+        '-y', 'output.mp4',
       ])
       if (code !== 0) throw new Error(`FFmpeg exited with code ${code}`)
       onProgress?.(100)
       const data = await ffmpeg.readFile('output.mp4')
-      return new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' })
+      return finalizeMp4Blob(new Uint8Array(data as Uint8Array))
     } finally {
       ffmpeg.terminate()
     }
@@ -308,10 +339,9 @@ export async function renderReel(opts: {
         const filterArgs = fc ? ['-filter_complex', fc] : ['-vf', vf!]
         console.log(`[renderer] encoding clip ${i}: landscape=${isLandscape[i]}, buf=${buf.byteLength}B`)
         const exitCode = await ff.exec([
-          '-framerate', String(OUTPUT_FPS), '-loop', '1', '-t', String(photoDuration), '-i', 'input.jpg',
+          ...stillInputArgs('input.jpg', i),
           ...filterArgs,
-          '-r', String(OUTPUT_FPS),
-          '-c:v', 'libx264', '-crf', '23', '-maxrate', '3M', '-bufsize', '6M', '-preset', 'ultrafast',
+          ...clipVideoArgs(),
           '-y', 'clip.mp4',
         ])
         if (exitCode !== 0) {
@@ -402,7 +432,7 @@ export async function renderReel(opts: {
 
     onProgress?.(100)
     const data = await concatFF.readFile('output.mp4')
-    return new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' })
+    return finalizeMp4Blob(new Uint8Array(data as Uint8Array))
   } catch (err) {
     throw err instanceof Error ? err : new Error(String(err))
   } finally {
