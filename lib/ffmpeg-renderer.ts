@@ -179,6 +179,9 @@ export async function renderReel(opts: {
 
   type Filter = { vf: string; fc?: never } | { fc: string; vf?: never }
 
+  const clipFrames = Math.max(Math.round(OUTPUT_FPS * photoDuration), 2)
+  const onLast = clipFrames - 1
+
   const portraitFilter = (i: number): string => {
     const prep = [
       `scale=${ZOOMED_W}:${ZOOMED_H}:force_original_aspect_ratio=increase`,
@@ -186,45 +189,30 @@ export async function renderReel(opts: {
       'setsar=1',
     ].join(',')
 
-    // All clips zoom-in (crop shrinks from ZOOMED→1080) + pan right (x: 0→DW).
-    // This ensures every portrait clip has clearly visible horizontal motion.
-    // Zoom-out (crop grows) was reverted: when w starts at exactly the scale
-    // target (1080), FFmpeg WASM may skip the scale step for frame 0, then
-    // fails when the crop grows on frame 1 and the filter graph size is no
-    // longer consistent — exit 1.
-    // Odd clips also pan down (y: 0→DH) for visual variety.
-    // Use `t` (PTS seconds) — reliable for looped still images in WASM;
-    // `n` (frame count) can skip across exec() calls.
-    // Wrap in 2*floor(.../2) so w/h/x/y stay integer and even — raw
-    // expressions like `2074-154*t/2` evaluate to fractions at most frames
-    // and FFmpeg WASM rejects them with "Failed to configure input pad".
-    const dur = photoDuration
+    // Animated crop (w/h/x/y time expressions) fails in FFmpeg WASM — even with
+    // floor() — with "Failed to configure input pad". zoompan handles fractional
+    // x/y/z internally and is the standard Ken Burns filter for still images.
     const panDown = i % 2 === 1
-    const x = `2*floor(${DW}*t/${dur}/2)`
-    const w = `2*floor((${ZOOMED_W}-${DW}*t/${dur})/2)`
-    const y = panDown ? `2*floor(${DH}*t/${dur}/2)` : '0'
-    const h = `2*floor((${ZOOMED_H}-${DH}*t/${dur})/2)`
-    return `${prep},crop=w='${w}':h='${h}':x='${x}':y='${y}',scale=1080:1920,setsar=1`
+    const zExpr = `1+${ZOOM_MAGNITUDE}*on/${onLast}`
+    const xExpr = `(iw-iw/zoom)*on/${onLast}`
+    const yExpr = panDown ? `(ih-ih/zoom)*on/${onLast}` : `(ih-ih/zoom)/2`
+
+    return (
+      `${prep},` +
+      `zoompan=z='${zExpr}':x='${xExpr}':y='${yExpr}':d=${clipFrames}:s=1080x1920:fps=${OUTPUT_FPS},` +
+      `format=yuv420p,setsar=1`
+    )
   }
 
-  const landscapeFilter = (i: number): string => {
-    // pan direction alternates per photo (integer x — same fractional issue as portrait)
-    const dur = photoDuration
-    const panX = i % 2 === 0
-      ? `2*floor(${DW}*t/${dur}/2)`
-      : `2*floor((${DW}-${DW}*t/${dur})/2)`
-    // Background: fill 1080×1920, blur heavily, darken 25%
-    // Foreground: scale to ZOOMED_W wide, crop 1080px wide with pan, overlay centred
-    // Blur via scale-down + scale-up (bilinear). gblur=sigma=25 is O(radius²) per
-    // pixel — at 1080×1920 it takes minutes in single-threaded WASM. This is
-    // ~10,000× faster and produces an indistinguishable blurry background.
+  const landscapeFilter = (_i: number): string => {
+    // Static centre crop — animated x in crop= also fails in WASM.
     return (
       `[0:v]split=2[fg][bg];` +
       `[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,` +
       `scale=68:120:flags=bilinear,scale=1080:1920:flags=bilinear,eq=brightness=-0.25[bgblur];` +
       `[fg]scale=${ZOOMED_W}:-2[fgbig];` +
-      `[fgbig]crop=1080:ih:${panX}:0[fgpan];` +
-      `[bgblur][fgpan]overlay=0:(H-h)/2,setsar=1`
+      `[fgbig]crop=1080:ih:(iw-1080)/2:0[fgpan];` +
+      `[bgblur][fgpan]overlay=0:(H-h)/2,format=yuv420p,setsar=1`
     )
   }
 
