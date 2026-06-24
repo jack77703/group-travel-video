@@ -208,17 +208,27 @@ export async function renderReel(opts: {
       'setsar=1',
     ].join(',')
 
-    // Animated crop (w/h/x/y time expressions) fails in FFmpeg WASM — even with
-    // floor() — with "Failed to configure input pad". zoompan handles fractional
-    // x/y/z internally and is the standard Ken Burns filter for still images.
-    const panDown = i % 2 === 1
-    const zExpr = `1+${ZOOM_MAGNITUDE}*on/${onLast}`
-    const xExpr = `(iw-iw/zoom)*on/${onLast}`
-    const yExpr = panDown ? `(ih-ih/zoom)*on/${onLast}` : `(ih-ih/zoom)/2`
+    // z/x/y each driven directly by on/onLast — no coupling between them.
+    // zoom-in must start at (0,0) because at z=1.0 the crop fills the whole image.
+    // zoom-out can start at (DW,DH) because at z=1.08 those offsets are within range.
+    const zIn  = `1+${ZOOM_MAGNITUDE}*on/${onLast}`
+    const zOut = `${1 + ZOOM_MAGNITUDE}-${ZOOM_MAGNITUDE}*on/${onLast}`
+    const xFwd = `${DW}*on/${onLast}`
+    const xBak = `${DW}-${DW}*on/${onLast}`
+    const yFwd = `${DH}*on/${onLast}`
+    const yBak = `${DH}-${DH}*on/${onLast}`
+
+    const corners = [
+      { z: zIn,  x: xFwd, y: yFwd },  // 0: zoom in,  TL → BR diagonal
+      { z: zOut, x: xBak, y: yBak },  // 1: zoom out, BR → TL diagonal
+      { z: zIn,  x: xFwd, y: '0'  },  // 2: zoom in,  L → R horizontal
+      { z: zOut, x: xBak, y: '0'  },  // 3: zoom out, R → L horizontal
+    ] as const
+    const { z, x, y } = corners[i % 4]
 
     return (
       `${prep},` +
-      `zoompan=z='${zExpr}':x='${xExpr}':y='${yExpr}':d=${clipFrames}:s=1080x1920:fps=${OUTPUT_FPS},` +
+      `zoompan=z='${z}':x='${x}':y='${y}':d=${clipFrames}:s=1080x1920:fps=${OUTPUT_FPS},` +
       `format=yuv420p,setsar=1`
     )
   }
