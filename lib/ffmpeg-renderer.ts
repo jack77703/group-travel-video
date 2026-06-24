@@ -177,6 +177,12 @@ export async function renderReel(opts: {
     })
   )
 
+  // Track each photo's position within the landscape-photo sequence (0 = first
+  // landscape photo, 1 = second, etc.) to alternate LTR/RTL pan independently
+  // of portrait photos.
+  let _lscapeCount = 0
+  const landscapeSeq = isLandscape.map(land => land ? _lscapeCount++ : -1)
+
   // ─── Ken Burns filters ────────────────────────────────────────────────────
   //
   // Portrait  → zoom-in/out with corner variation
@@ -233,14 +239,21 @@ export async function renderReel(opts: {
     )
   }
 
-  const landscapeFilter = (_i: number): string => {
-    // Static centre crop — animated x in crop= also fails in WASM.
+  const landscapeFilter = (i: number): string => {
+    const seq = landscapeSeq[i]  // 0 for first landscape photo, 1 for second, etc.
+    const ltr = seq % 2 === 0
+    // Only x varies; w=1080 and h=ih are constant integers, so the filter graph
+    // output size never changes and WASM never reinitializes the filter graph.
+    // t goes from 0 to photoDuration (set by -framerate -loop 1 -t in stillInputArgs).
+    const xExpr = ltr
+      ? `${DW}*t/${photoDuration}`           // 0 → DW  (left to right)
+      : `${DW}-${DW}*t/${photoDuration}`    // DW → 0  (right to left)
     return (
       `[0:v]split=2[fg][bg];` +
       `[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,` +
       `scale=68:120:flags=bilinear,scale=1080:1920:flags=bilinear,eq=brightness=-0.25[bgblur];` +
       `[fg]scale=${ZOOMED_W}:-2[fgbig];` +
-      `[fgbig]crop=1080:ih:(iw-1080)/2:0[fgpan];` +
+      `[fgbig]crop=1080:ih:'${xExpr}':0[fgpan];` +
       `[bgblur][fgpan]overlay=0:(H-h)/2,format=yuv420p,setsar=1`
     )
   }
