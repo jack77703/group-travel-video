@@ -36,11 +36,11 @@ async function streamToBlobURL(
 // 24 fps is cinema standard and imperceptibly different from 30 fps for
 // 2-3 s Ken Burns clips. Encodes 20% fewer frames with zero visible quality loss.
 const OUTPUT_FPS = 24
-const ZOOM_MAGNITUDE = 0.08
-const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1166
-const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2074
-const DW = ZOOMED_W - 1080 // 86
-const DH = ZOOMED_H - 1920 // 154
+const ZOOM_MAGNITUDE = 0.05
+const ZOOMED_W = Math.round(1080 * (1 + ZOOM_MAGNITUDE)) // 1134
+const ZOOMED_H = Math.round(1920 * (1 + ZOOM_MAGNITUDE)) // 2016
+const DW = ZOOMED_W - 1080 // 54
+const DH = ZOOMED_H - 1920 // 96
 // Supabase Storage rejects uploads over the project file-size limit (~50 MB).
 const MAX_UPLOAD_BYTES = 45 * 1024 * 1024
 
