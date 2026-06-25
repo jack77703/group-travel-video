@@ -45,7 +45,7 @@ const DH = ZOOMED_H - 1920 // 96
 const MAX_UPLOAD_BYTES = 45 * 1024 * 1024
 
 const VIDEO_ENCODE = [
-  '-c:v', 'libx264', '-crf', '28', '-maxrate', '2M', '-bufsize', '4M',
+  '-c:v', 'libx264', '-crf', '23', '-maxrate', '4M', '-bufsize', '8M',
   '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
 ] as const
 
@@ -384,6 +384,12 @@ export async function renderReel(opts: {
 
     let clipsDone = 0
     let clipBuffers: Uint8Array[]
+    // Monotonic guard — progress can only go forward (fallback path restarts
+    // clipsDone from 0 which would otherwise cause visible regressions in the UI).
+    let _highWater = 0
+    const reportProgress = (pct: number) => {
+      if (pct > _highWater) { _highWater = pct; onProgress?.(pct) }
+    }
 
     try {
       clipBuffers = await Promise.all(
@@ -391,7 +397,7 @@ export async function renderReel(opts: {
           pool.enqueue(i, async (ff) => {
             const buf = await encodeOneClip(ff, i)
             clipsDone++
-            onProgress?.(Math.round((clipsDone / photos.length) * 85))
+            reportProgress(Math.round((clipsDone / photos.length) * 85))
             return buf
           })
         )
@@ -410,7 +416,7 @@ export async function renderReel(opts: {
         for (let i = 0; i < photos.length; i++) {
           clipBuffers.push(await encodeOneClip(seqFF, i))
           clipsDone++
-          onProgress?.(Math.round((clipsDone / photos.length) * 85))
+          reportProgress(Math.round((clipsDone / photos.length) * 85))
         }
       } finally {
         seqFF.terminate()
@@ -418,7 +424,7 @@ export async function renderReel(opts: {
     }
 
     pool.terminateAll()
-    onProgress?.(88)
+    reportProgress(88)
 
     // Concat pass: stream-copy clips + mix audio. Fast — no re-encode.
     concatFF = new FFmpeg()
@@ -442,7 +448,7 @@ export async function renderReel(opts: {
           : `file 'clip${i}.mp4'\nduration ${photoDuration}`
       }).join('\n')
     await concatFF.writeFile('clips.txt', concatTxt)
-    onProgress?.(90)
+    reportProgress(90)
 
     const concatCode = await concatFF.exec([
       '-f', 'concat', '-safe', '0', '-i', 'clips.txt',
@@ -454,7 +460,7 @@ export async function renderReel(opts: {
     ])
     if (concatCode !== 0) throw new Error(`FFmpeg concat step failed (exit ${concatCode})`)
 
-    onProgress?.(100)
+    reportProgress(100)
     const data = await concatFF.readFile('output.mp4')
     return finalizeMp4Blob(new Uint8Array(data as Uint8Array))
   } catch (err) {
