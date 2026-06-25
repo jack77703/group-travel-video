@@ -138,7 +138,7 @@ export default function GeneratePage() {
       return
     }
 
-    setStatus('idle')
+    setStatus('loading-encoder')
     setError('')
     setPct(0)
     setDlPct(0)
@@ -164,7 +164,6 @@ export default function GeneratePage() {
         saveSettings(code, { mood: selectedMood, track: selected, pace })
       }
 
-      setStatus('loading-encoder')
       const { renderReel } = await import('@/lib/ffmpeg-renderer')
 
       const musicUrl = `/api/proxy-audio?url=${encodeURIComponent(selected.url)}`
