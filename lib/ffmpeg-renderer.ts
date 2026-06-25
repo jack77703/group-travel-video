@@ -244,10 +244,11 @@ export async function renderReel(opts: {
     const ltr = seq % 2 === 0
     // Only x varies; w=1080 and h=ih are constant integers, so the filter graph
     // output size never changes and WASM never reinitializes the filter graph.
-    // t goes from 0 to photoDuration (set by -framerate -loop 1 -t in stillInputArgs).
+    // Use n (0-indexed frame number) instead of t so the pan reaches exactly DW
+    // at the last frame, matching portrait's on/onLast approach.
     const xExpr = ltr
-      ? `${DW}*t/${photoDuration}`           // 0 → DW  (left to right)
-      : `${DW}-${DW}*t/${photoDuration}`    // DW → 0  (right to left)
+      ? `${DW}*n/${onLast}`           // 0 → DW  (left to right)
+      : `${DW}-${DW}*n/${onLast}`    // DW → 0  (right to left)
     return (
       `[0:v]split=2[fg][bg];` +
       `[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,` +
